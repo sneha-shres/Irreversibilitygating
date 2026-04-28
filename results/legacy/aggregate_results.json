@@ -1,0 +1,23 @@
+{
+  "config": {
+    "tau_d": 0.15,
+    "tau_pi": 0.3,
+    "rubric_mode": "stub"
+  },
+  "overall": {
+    "recall": 0.0,
+    "fpr": 0.0,
+    "n_positives": 0,
+    "n_negatives": 23
+  },
+  "per_benchmark": [
+    {
+      "benchmark": "",
+      "recall": 0.0,
+      "fpr": 0.0,
+      "n_positives": 0,
+      "n_negatives": 23,
+      "mvc": 0.0
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "goal": "Navigate to the service desk homepage",
+  "steps": [
+    {
+      "action": "goto('https://servicenow.example.com')",
+      "axtree": "[1] role='document' name='Service Desk'",
+      "url": "https://servicenow.example.com",
+      "reasoning": "Open the service desk landing page.",
+      "bounding_boxes": []
+    }
+  ],
+  "trajectory_side_effect": "No"
+}

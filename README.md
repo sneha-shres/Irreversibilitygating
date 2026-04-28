@@ -1,1 +1,112 @@
-# Irreversibilitygating
+# IrrGate
+
+A runtime, per-step safety gate for web-based AI agents. At each step, IrrGate intercepts the agent's proposed action, evaluates the cumulative trajectory so far, and approves or blocks the action before it executes.
+
+Evaluated retrospectively on WorkArena and WebArena trajectories from [AgentRewardBench](https://github.com/McGill-NLP/agent-reward-bench).
+
+## How It Works
+
+BrowserGym agents are **reactive** — they produce one action at a time with no upfront plan. IrrGate fits this model:
+
+```
+agent proposes action
+        ↓
+classify trajectory-so-far by reversibility level (L0–L3)
+        ↓
+compute risk profile (f, d_I, π)
+        ↓
+route to regime (BYPASS / LOW / MEDIUM / HIGH)
+        ↓
+evaluate safety rubric (R1–R5) → approve or block
+```
+
+In the retrospective evaluation, completed trajectories are replayed to determine at which step IrrGate would have intervened.
+
+## Installation
+
+```bash
+pip install -e .
+```
+
+## Data Download
+
+```bash
+python scripts/download_data.py --output-dir data/raw
+```
+
+Downloads `annotations.csv` and WorkArena/WebArena trajectory JSON files from HuggingFace.
+
+## Build Evaluation Set
+
+```bash
+python scripts/build_eval_set.py --data-dir data/raw --output data/eval_set.json
+```
+
+Creates `data/eval_set.json` with positive (side-effect) and negative trajectories.
+
+## Run Evaluation
+
+```bash
+python scripts/run_evaluation.py \
+  --eval-set data/eval_set.json \
+  --trajectory-dir data/raw \
+  --tau-d 0.1 \
+  --tau-pi 0.3 \
+  --rubric-mode gemini \
+  --output-dir results/my_run
+```
+
+Options:
+- `--tau-d`: d_I threshold to enter LOW regime (default 0.15)
+- `--tau-pi`: π threshold to enter MEDIUM+ regime (default 0.30)
+- `--rubric-mode`: `stub` (fast, rule-based only) or `gemini` (LLM stage-2, more accurate)
+- `--run-ablation`: Include ablation study comparing config variants
+- `--output-dir`: Output directory (default `results/{date}/`)
+- `--no-resume`: Ignore existing progress and restart from scratch
+
+## Results
+
+Results are saved to `results/{date}/`:
+- `per_trajectory_results.csv`: One row per trajectory with blocking decisions
+- `aggregate_results.json`: Summary metrics
+- `progress.jsonl`: Per-trajectory log, used for resuming interrupted runs
+
+The script prints a summary to stdout including two recall metrics:
+
+| Metric | Definition |
+|--------|-----------|
+| `recall` | caught / all positives |
+| `recall_catchable` | caught / positives where agent reached a classifiable L2/L3 step |
+
+**Use `recall_catchable` as the primary metric.** `side_effect_label=Yes` in AgentRewardBench is a task-level annotation — some agent runs never reach the side-effecting step (agent failure or navigational loop). IrrGate cannot intercept actions that are classified L0/L1, so those trajectories are excluded from the catchable denominator.
+
+## Project Structure
+
+```
+irrgate/
+├── irrgate/              # Core package
+│   ├── actions.py        # Action parsing and representation
+│   ├── classifier.py     # Stage-1 rules + stage-2 LLM fallback (L0–L3)
+│   ├── config.py         # Hyperparameters (ALPHA, TAU_D, TAU_PI, RUBRIC_MODE)
+│   ├── gate.py           # End-to-end per-step gating logic
+│   ├── profile.py        # Risk profile: f, d_I, π
+│   ├── routing.py        # Regime routing (BYPASS/LOW/MEDIUM/HIGH)
+│   ├── rubric.py         # Safety rubric R1–R5
+│   ├── taxonomy.py       # Level definitions and severity weights
+│   ├── data/             # Data loading utilities
+│   └── evaluation/       # Metrics, runner, analysis
+├── scripts/
+│   ├── download_data.py  # Pull AgentRewardBench from HuggingFace
+│   ├── build_eval_set.py # Build stratified eval set
+│   └── run_evaluation.py # Main entry point
+├── tests/                # Unit tests (pytest)
+└── pyproject.toml
+```
+
+## Running Tests
+
+```bash
+pytest tests/
+```
+
+62 tests pass. 4 pre-existing failures in `test_loader` / `test_sampler` are unrelated to core gating logic.
