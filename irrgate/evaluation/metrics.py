@@ -3,19 +3,19 @@ from __future__ import annotations
 from typing import Any
 
 from irrgate.actions import Action
-from irrgate.classifier import classify_stage1
+from irrgate.classifier import classify
 from irrgate.data.loader import Trajectory
 from irrgate.evaluation.runner import TrajectoryResult
 from irrgate.taxonomy import Level
 
 
 def _find_candidate_side_effect_step(trajectory: Trajectory) -> int | None:
-    """Find the latest L2 or L3 action in the trajectory (heuristic for side-effect step)."""
+    """Find the latest L2 or L3 action in the trajectory using the full pipeline."""
     latest_irreversible = None
     for idx, step in enumerate(trajectory.steps):
         action = Action.from_step(step, step_index=idx)
-        level = classify_stage1(action)
-        if level is not None and level.value >= 2:  # L2 or L3
+        level = classify(action)
+        if level.value >= 2:
             latest_irreversible = idx
     return latest_irreversible
 
@@ -61,8 +61,12 @@ def per_task_aggregation(results: list[TrajectoryResult]) -> dict[str, dict[str,
 
     task_metrics = {}
     for task_id, task_results in by_task.items():
-        # For simplicity, assume single result per task, but aggregate if multiple
-        result = task_results[0]  # Take first if multiple
+        if len(task_results) > 1:
+            raise ValueError(
+                f"Multiple results for task_id {task_id!r}. "
+                "Use a composite (task_id, model) key to avoid collisions."
+            )
+        result = task_results[0]
         is_positive = result.trajectory.side_effect_label.lower() == "yes"
         blocked = result.first_blocking_step is not None
 

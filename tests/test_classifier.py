@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from irrgate.actions import Action
 from irrgate.classifier import classify, classify_stage1, classify_stage2
 from irrgate.taxonomy import Level
@@ -78,17 +80,21 @@ def test_stage1_ambiguous_click_returns_none():
     assert classify_stage1(action) is None
 
 
-def test_classify_ambiguous_click_uses_stage2_stub():
+def test_classify_ambiguous_click_uses_stage2():
     action = Action.from_step(
         make_step("click('1976')", "[1976] role='button' name='More info'"),
         0,
     )
-    assert classify(action, prior_axtrees=[]) == Level.L1
+    with patch("irrgate.classifier._classify_stage2_gemini_cached", return_value=(Level.L1, None)):
+        assert classify(action, prior_axtrees=[]) == Level.L1
 
 
-def test_stage2_stub_returns_L1_for_all_inputs():
+def test_stage2_calls_gemini():
     action = Action.from_step(make_step("click('1976')"), 0)
-    assert classify_stage2(action, prior_axtrees=[]) == Level.L1
+    with patch("irrgate.classifier._classify_stage2_gemini_cached", return_value=(Level.L2, None)) as mock_gemini:
+        result = classify_stage2(action, prior_axtrees=[])
+        assert result == Level.L2
+        mock_gemini.assert_called_once()
 
 
 def test_stage1_malformed_action_with_empty_text_returns_none():
@@ -106,9 +112,10 @@ def test_stage1_fill_with_empty_placeholder_escalates_to_stage2():
     assert classify_stage1(action) is None
 
 
-def test_fill_with_empty_placeholder_defers_to_stage2_stub():
+def test_fill_with_empty_placeholder_defers_to_stage2():
     action = Action.from_step(
         make_step("fill('a582', '2029-04-15 08:25:08')", "[a582] gridcell '(empty)', visible"),
         5,
     )
-    assert classify(action) == Level.L1
+    with patch("irrgate.classifier._classify_stage2_gemini_cached", return_value=(Level.L1, None)):
+        assert classify(action) == Level.L1

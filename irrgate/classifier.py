@@ -3,12 +3,62 @@ from __future__ import annotations
 import json
 import os
 import re
+from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from typing import Iterable
 
+from irrgate._gemini import generate_with_backoff, get_gemini_client
 from irrgate.actions import Action
-from irrgate.config import RUBRIC_MODE
 from irrgate.taxonomy import Level
+
+CLASSIFIER_VERSION = "1.0.0"
+_STAGE2_PROMPT_VERSION = "v1"
+
+
+@dataclass
+class ClassificationResult:
+    stage1_level: Level | None       # None if stage 1 abstained
+    stage2_level: Level | None       # None if stage 2 not invoked
+    final_level: Level
+    stage_used: int                  # 1 or 2
+    stage2_raw_response: str | None  # None for cache hits or stage-1 decisions
+    stage2_model: str | None         # None for cache hits or stage-1 decisions
+    stage2_prompt_version: str | None
+    classifier_version: str
+
+# ---------------------------------------------------------------------------
+# Persistent Gemini classification cache
+# Survives across evaluation runs so ablation / grid configs don't re-call
+# the API for actions already classified in a previous run.
+# ---------------------------------------------------------------------------
+_CACHE_PATH = Path(__file__).resolve().parents[1] / "data" / "gemini_cache.json"
+_disk_cache: dict[str, str] = {}
+_cache_dirty = False
+
+
+def _load_disk_cache() -> None:
+    global _disk_cache
+    if _CACHE_PATH.exists():
+        try:
+            _disk_cache = json.loads(_CACHE_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            _disk_cache = {}
+
+
+def _save_disk_cache() -> None:
+    global _cache_dirty
+    if not _cache_dirty:
+        return
+    try:
+        _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _CACHE_PATH.write_text(json.dumps(_disk_cache), encoding="utf-8")
+        _cache_dirty = False
+    except OSError:
+        pass
+
+
+_load_disk_cache()
 
 
 _SUBMIT_PATTERN = re.compile(
@@ -76,17 +126,6 @@ def classify_stage1(action: Action) -> Level | None:
     return None
 
 
-@lru_cache(maxsize=1)
-def _gemini_client():
-    from google import genai
-
-    project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-    location = os.environ.get("VERTEX_LOCATION", "us-central1")
-    if not project:
-        raise RuntimeError("GOOGLE_CLOUD_PROJECT must be set for Gemini stage-2 classification")
-    return genai.Client(vertexai=True, project=project, location=location)
-
-
 _STAGE2_SYSTEM_PROMPT = (
     "You are classifying a single web-agent action by its irreversibility level. Levels:\n"
     "L0 = read-only (navigation, scrolling, screenshots, reading content; no state change).\n"
@@ -118,12 +157,18 @@ def _stage2_prompt(action: Action) -> str:
 
 
 @lru_cache(maxsize=4096)
-def _classify_stage2_gemini_cached(prompt: str) -> Level:
-    from irrgate.rubric import _generate_with_backoff
+def _classify_stage2_gemini_cached(prompt: str) -> tuple[Level, str | None]:
+    global _cache_dirty
 
-    client = _gemini_client()
+    if prompt in _disk_cache:
+        try:
+            return Level[_disk_cache[prompt]], None
+        except KeyError:
+            pass
+
+    client = get_gemini_client()
     model = os.environ.get("VERTEX_MODEL", "gemini-2.0-flash")
-    response = _generate_with_backoff(
+    response = generate_with_backoff(
         client,
         model=model,
         contents=prompt,
@@ -140,23 +185,56 @@ def _classify_stage2_gemini_cached(prompt: str) -> Level:
         },
     )
     if response is None:
-        return Level.L1
-    try:
-        parsed = json.loads(response.text)
-        return Level[parsed["level"]]
-    except (json.JSONDecodeError, KeyError, AttributeError, TypeError):
-        return Level.L1
+        level = Level.L1
+        raw: str | None = None
+    else:
+        raw = response.text
+        try:
+            parsed = json.loads(raw)
+            level = Level[parsed["level"]]
+        except (json.JSONDecodeError, KeyError, AttributeError, TypeError):
+            level = Level.L1
+
+    _disk_cache[prompt] = level.name
+    _cache_dirty = True
+    _save_disk_cache()
+    return level, raw
 
 
-def classify_stage2(action: Action, prior_axtrees: Iterable[str] | None = None, mode: str | None = None) -> Level:
-    mode = mode if mode is not None else RUBRIC_MODE
-    if mode == "gemini":
-        return _classify_stage2_gemini_cached(_stage2_prompt(action))
-    return Level.L1
+def classify_stage2(action: Action, prior_axtrees: Iterable[str] | None = None) -> Level:
+    level, _ = _classify_stage2_gemini_cached(_stage2_prompt(action))
+    return level
 
 
-def classify(action: Action, prior_axtrees: Iterable[str] | None = None, mode: str | None = None) -> Level:
-    level = classify_stage1(action)
-    if level is not None:
-        return level
-    return classify_stage2(action, prior_axtrees, mode=mode)
+def classify_with_details(
+    action: Action, prior_axtrees: Iterable[str] | None = None
+) -> ClassificationResult:
+    s1 = classify_stage1(action)
+    if s1 is not None:
+        return ClassificationResult(
+            stage1_level=s1,
+            stage2_level=None,
+            final_level=s1,
+            stage_used=1,
+            stage2_raw_response=None,
+            stage2_model=None,
+            stage2_prompt_version=None,
+            classifier_version=CLASSIFIER_VERSION,
+        )
+
+    prompt = _stage2_prompt(action)
+    s2, raw = _classify_stage2_gemini_cached(prompt)
+    return ClassificationResult(
+        stage1_level=None,
+        stage2_level=s2,
+        final_level=s2,
+        stage_used=2,
+        stage2_raw_response=raw,
+        stage2_model=os.environ.get("VERTEX_MODEL", "gemini-2.0-flash") if raw is not None else None,
+        stage2_prompt_version=_STAGE2_PROMPT_VERSION,
+        classifier_version=CLASSIFIER_VERSION,
+    )
+
+
+def classify(action: Action, prior_axtrees: Iterable[str] | None = None) -> Level:
+    return classify_with_details(action, prior_axtrees).final_level

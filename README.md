@@ -15,7 +15,7 @@ classify trajectory-so-far by reversibility level (L0–L3)
         ↓
 compute risk profile (f, d_I, π)
         ↓
-route to regime (BYPASS / LOW / MEDIUM / HIGH)
+route to regime (BYPASS / LOW / GATED)
         ↓
 evaluate safety rubric (R1–R5) → approve or block
 ```
@@ -57,9 +57,9 @@ python scripts/run_evaluation.py \
 ```
 
 Options:
-- `--tau-d`: d_I threshold to enter LOW regime (default 0.15)
-- `--tau-pi`: π threshold to enter MEDIUM+ regime (default 0.30)
-- `--rubric-mode`: `stub` (fast, rule-based only) or `gemini` (LLM stage-2, more accurate)
+- `--tau-d`: d_I threshold separating LOW from GATED (default 0.15)
+- `--tau-pi`: π threshold separating LOW from GATED (default 0.30)
+- `--rubric-mode`: `gemini` (default, LLM stage-2 via Vertex AI)
 - `--run-ablation`: Include ablation study comparing config variants
 - `--output-dir`: Output directory (default `results/{date}/`)
 - `--no-resume`: Ignore existing progress and restart from scratch
@@ -78,7 +78,7 @@ The script prints a summary to stdout including two recall metrics:
 | `recall` | caught / all positives |
 | `recall_catchable` | caught / positives where agent reached a classifiable L2/L3 step |
 
-**Use `recall_catchable` as the primary metric.** `side_effect_label=Yes` in AgentRewardBench is a task-level annotation — some agent runs never reach the side-effecting step (agent failure or navigational loop). IrrGate cannot intercept actions that are classified L0/L1, so those trajectories are excluded from the catchable denominator.
+**Use `recall` as the primary metric** (caught / all positives). `recall_catchable` is a secondary diagnostic that excludes trajectories where the classifier never reached an L2/L3 action.
 
 ## Project Structure
 
@@ -90,7 +90,7 @@ irrgate/
 │   ├── config.py         # Hyperparameters (ALPHA, TAU_D, TAU_PI, RUBRIC_MODE)
 │   ├── gate.py           # End-to-end per-step gating logic
 │   ├── profile.py        # Risk profile: f, d_I, π
-│   ├── routing.py        # Regime routing (BYPASS/LOW/MEDIUM/HIGH)
+│   ├── routing.py        # Regime routing (BYPASS/LOW/GATED)
 │   ├── rubric.py         # Safety rubric R1–R5
 │   ├── taxonomy.py       # Level definitions and severity weights
 │   ├── data/             # Data loading utilities
@@ -109,4 +109,4 @@ irrgate/
 pytest tests/
 ```
 
-62 tests pass. 4 pre-existing failures in `test_loader` / `test_sampler` are unrelated to core gating logic.
+66 tests pass. 2 pre-existing failures in `test_loader` are unrelated to core gating logic.

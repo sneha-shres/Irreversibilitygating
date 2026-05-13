@@ -1,0 +1,10 @@
+{
+  "eval_set": "data/eval_set.json",
+  "trajectory_dir": "data/raw",
+  "rubric_mode": "gemini",
+  "tau_d": 0.15,
+  "tau_pi": 0.30,
+  "baseline_output_dir": "results/baseline_gemini",
+  "analysis_output_dir": "results/threshold_analysis",
+  "final_output_dir": "results/final_thresholds"
+}

@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Iterable
 
+from irrgate.actions import Action, _LABEL_FIELD_PATTERN
 from irrgate.config import ALPHA
 from irrgate.taxonomy import Level, severity_weight
-
-_LABEL_FIELD_PATTERN = re.compile(
-    r"(?:name|label|text|placeholder|content)\s*=\s*'((?:[^'\\]|\\.)*)'",
-    re.IGNORECASE,
-)
 
 
 @dataclass
@@ -20,14 +17,19 @@ class RiskProfile:
     pi: float
 
 
-def _extract_labels_from_axtree(axtree: str) -> set[str]:
-    if not axtree:
-        return set()
+@lru_cache(maxsize=1024)
+def _extract_labels_from_axtree(axtree: str) -> frozenset[str]:
+    """Return the set of accessible-name labels present in an AX-tree string.
 
-    labels: set[str] = set()
-    for match in _LABEL_FIELD_PATTERN.finditer(axtree):
-        labels.add(match.group(1).strip().lower())
-    return labels
+    Results are cached in-process: the same axtree string (same page revisited, or
+    the same axtree appearing in multiple trajectories) is only parsed once.
+    """
+    if not axtree:
+        return frozenset()
+    return frozenset(
+        m.group(1).strip().lower()
+        for m in _LABEL_FIELD_PATTERN.finditer(axtree)
+    )
 
 
 def _target_bid_seen_in_prior_axtrees(bid: str, prior_axtrees: Iterable[str]) -> bool:
@@ -58,7 +60,7 @@ def fill_text_traceable_to_prior_axtrees(fill_text: str, prior_axtrees: Iterable
     return _fill_text_seen_in_prior_axtrees(fill_text, prior_axtrees)
 
 
-def compute_risk_profile(levels: list[Level], actions: list[object], axtrees: list[str]) -> RiskProfile:
+def compute_risk_profile(levels: list[Level], actions: list[Action], axtrees: list[str]) -> RiskProfile:
     if len(actions) != len(axtrees):
         raise ValueError("actions and axtrees must have the same length")
 
@@ -66,7 +68,7 @@ def compute_risk_profile(levels: list[Level], actions: list[object], axtrees: li
     f = int(any(value > 0 for value in severity_values))
     d_I = sum(severity_values) / len(severity_values) if severity_values else 0.0
 
-    distinct_bids = [action.target_bid for action in actions if getattr(action, "target_bid", None)]
+    distinct_bids = [action.target_bid for action in actions if action.target_bid]
     distinct_bids_in_full_plan = len(set(distinct_bids))
 
     weighted_residual = 0.0
@@ -76,10 +78,10 @@ def compute_risk_profile(levels: list[Level], actions: list[object], axtrees: li
     seen_bids: set[str] = set()
 
     for index, (action, severity, axtree) in enumerate(zip(actions, severity_values, axtrees)):
-        target_bid = getattr(action, "target_bid", None)
-        fill_text = getattr(action, "fill_text", None)
+        target_bid = action.target_bid
+        fill_text = action.fill_text
 
-        if distinct_bids_in_full_plan > 0 and distinct_bids_in_full_plan != 0:
+        if distinct_bids_in_full_plan > 0:
             bid_term = len(seen_bids) / distinct_bids_in_full_plan
         else:
             bid_term = 1.0

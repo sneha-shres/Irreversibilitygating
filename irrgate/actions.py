@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 _ACTION_ARG_PATTERN = re.compile(r"^([a-z_]+)\((.*)\)$", re.IGNORECASE)
-_QUOTED_STR_PATTERN = re.compile(r"'((?:[^'\\]|\\.)*)'")
+_SINGLE_QUOTED_PATTERN = re.compile(r"^'((?:[^'\\]|\\.)*)'$")
+_DOUBLE_QUOTED_PATTERN = re.compile(r'^"((?:[^"\\]|\\.)*)"$')
 _LABEL_FIELD_PATTERN = re.compile(
     r"(?:name|label|text|placeholder|content)\s*=\s*'((?:[^'\\]|\\.)*)'",
     re.IGNORECASE,
@@ -106,21 +107,24 @@ def split_args(args_text: str) -> list[str]:
             escape = True
             continue
 
-        if char == "'":
-            in_quote = not in_quote
+        if char in ("'", '"'):
+            if in_quote is False:
+                in_quote = char
+            elif char == in_quote:
+                in_quote = False
             current.append(char)
             continue
 
-        if char == "," and not in_quote and depth == 0:
+        if char == "," and in_quote is False and depth == 0:
             arg = "".join(current).strip()
             if arg:
                 args.append(arg)
             current = []
             continue
 
-        if char in "([{" and not in_quote:
+        if char in "([{" and in_quote is False:
             depth += 1
-        elif char in ")]}" and not in_quote and depth > 0:
+        elif char in ")]}" and in_quote is False and depth > 0:
             depth -= 1
 
         current.append(char)
@@ -134,9 +138,12 @@ def split_args(args_text: str) -> list[str]:
 
 
 def unquote_string(value: str) -> str:
-    quoted_match = _QUOTED_STR_PATTERN.fullmatch(value)
-    if quoted_match:
-        return quoted_match.group(1).replace("\\'", "'").replace('\\\\', "\\")
+    m = _SINGLE_QUOTED_PATTERN.fullmatch(value)
+    if m:
+        return m.group(1).replace("\\'", "'").replace('\\\\', "\\")
+    m = _DOUBLE_QUOTED_PATTERN.fullmatch(value)
+    if m:
+        return m.group(1).replace('\\"', '"').replace('\\\\', "\\")
     return value
 
 
@@ -147,10 +154,7 @@ def extract_element_text_from_axtree(axtree: str, bid: str) -> Optional[str]:
     escaped_bid = re.escape(bid)
     bid_pattern = re.compile(rf"\[{escaped_bid}\]")
 
-    lines = axtree.splitlines()
-    best_candidate: Optional[str] = None
-
-    for line in lines:
+    for line in axtree.splitlines():
         if bid_pattern.search(line):
             label_match = _LABEL_FIELD_PATTERN.search(line)
             if label_match:
@@ -158,6 +162,5 @@ def extract_element_text_from_axtree(axtree: str, bid: str) -> Optional[str]:
             role_match = _ROLE_NAME_PATTERN.search(line)
             if role_match:
                 return role_match.group(1)
-            continue
 
     return None

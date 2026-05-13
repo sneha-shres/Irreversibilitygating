@@ -13,9 +13,6 @@ def produce_results_table(
     negative_results: list[TrajectoryResult],
 ) -> pd.DataFrame:
     """Output a table with per-benchmark recall, FPR, MVC (mean LLM calls per trajectory)."""
-    # For now, MVC is 0 since we're using stub rubric
-    # In real implementation, count actual LLM calls
-
     # Group by benchmark
     benchmark_data = {}
     all_results = positive_results + negative_results
@@ -36,7 +33,6 @@ def produce_results_table(
         fpr = compute_false_positive_rate(data["negatives"])
         n_pos = len(data["positives"])
         n_neg = len(data["negatives"])
-        # MVC: mean LLM calls per trajectory (0 for stub)
         mvc = 0.0
 
         rows.append({
@@ -83,13 +79,33 @@ def produce_ablation_table(
     return pd.DataFrame(rows)
 
 
+_DISABLED = 99.0  # sentinel: component effectively removed (threshold never exceeded)
+
+
+def ablation_configs(tau_d: float, tau_pi: float) -> list[Config]:
+    """Return the four ablation configs for the given operating-point thresholds.
+
+    Components are disabled by setting their threshold to _DISABLED (99.0), meaning
+    the corresponding profile value never exceeds it and the signal plays no role in
+    routing.  tau=0.0 would make the threshold always exceeded (routes everything to
+    HIGH), which is wrong for ablation.
+    """
+    return [
+        Config(tau_d=_DISABLED, tau_pi=_DISABLED),  # f only
+        Config(tau_d=tau_d,     tau_pi=_DISABLED),  # f + d_I
+        Config(tau_d=_DISABLED, tau_pi=tau_pi),     # f + pi
+        Config(tau_d=tau_d,     tau_pi=tau_pi),     # full
+    ]
+
+
 def config_to_name(config: Config) -> str:
-    """Convert config to a readable name for ablation table."""
-    if config.tau_d == 0.0 and config.tau_pi == 0.0:
+    """Human-readable name for an ablation config."""
+    d_disabled = config.tau_d >= _DISABLED
+    pi_disabled = config.tau_pi >= _DISABLED
+    if d_disabled and pi_disabled:
         return "f only"
-    elif config.tau_pi == 0.0:
-        return "f + d only"
-    elif config.tau_d == 0.0:
-        return "f + pi only"
-    else:
-        return "Full IrrGate"
+    if pi_disabled:
+        return "f + d_I only"
+    if d_disabled:
+        return "f + π only"
+    return "Full IrrGate"

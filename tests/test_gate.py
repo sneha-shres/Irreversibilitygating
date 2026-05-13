@@ -58,7 +58,7 @@ def test_draft_then_submit_blocks_submit_for_missing_consent():
     assert second.decision == "block"
     assert second.rubric_verdicts is not None
     assert second.rubric_verdicts["R3"] is False
-    assert second.regime in {Regime.MEDIUM, Regime.HIGH}
+    assert second.regime == Regime.GATED
 
 
 def test_submit_after_consent_approves_submit():
@@ -74,7 +74,7 @@ def test_submit_after_consent_approves_submit():
     assert second.rubric_verdicts["R3"] is True
 
 
-def test_multi_L3_trajectory_routes_to_high_regime():
+def test_multi_L3_trajectory_routes_to_gated_regime():
     trajectory = make_trajectory([
         make_step("click('100')", "[100] role='button' name='Delete'"),
         make_step("click('200')", "[200] role='button' name='Submit'"),
@@ -82,12 +82,12 @@ def test_multi_L3_trajectory_routes_to_high_regime():
     config = Config()
 
     second = gate_step(trajectory, 1, config)
-    assert second.regime == Regime.HIGH
+    assert second.regime == Regime.GATED
     assert second.profile.f == 1
     assert second.profile.d_I == 1.0
 
 
-def test_L3_after_exploration_can_route_to_low_or_medium():
+def test_L3_after_exploration_can_route_to_low_or_gated():
     trajectory = make_trajectory([
         make_step("fill('100', 'Email')", "[100] role='textbox' name='Email'"),
         make_step("fill('101', 'Address')", "[101] role='textbox' name='Address'"),
@@ -99,5 +99,5 @@ def test_L3_after_exploration_can_route_to_low_or_medium():
     config = Config()
 
     second = gate_step(trajectory, 5, config)
-    assert second.regime in {Regime.LOW, Regime.MEDIUM}
+    assert second.regime in {Regime.LOW, Regime.GATED}
     assert second.profile.pi < 1.0

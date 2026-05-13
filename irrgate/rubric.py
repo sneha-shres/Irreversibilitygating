@@ -2,17 +2,53 @@ from __future__ import annotations
 
 import json
 import os
-from functools import lru_cache
+from pathlib import Path
 from typing import Iterable
 
+from irrgate._gemini import generate_with_backoff, get_gemini_client
 from irrgate.actions import Action
-from irrgate.config import RUBRIC_MODE
 from irrgate.profile import (
     fill_text_traceable_to_prior_axtrees,
     target_bid_traceable_to_prior_axtrees,
 )
 from irrgate.routing import Regime
 from irrgate.taxonomy import Level
+
+RUBRIC_PROMPT_VERSION = "v1"
+
+# ---------------------------------------------------------------------------
+# Rubric LLM disk cache — keyed by the raw prompt text, same pattern as the
+# classifier's gemini_cache.json.  Stored as {"R4": bool, "R5": bool}.
+# ---------------------------------------------------------------------------
+_RUBRIC_CACHE_PATH = Path(__file__).resolve().parents[1] / "data" / "rubric_llm_cache.json"
+_rubric_disk_cache: dict[str, dict[str, bool]] = {}
+_rubric_cache_dirty = False
+
+
+def _load_rubric_cache() -> None:
+    global _rubric_disk_cache
+    if _RUBRIC_CACHE_PATH.exists():
+        try:
+            _rubric_disk_cache = json.loads(_RUBRIC_CACHE_PATH.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            _rubric_disk_cache = {}
+
+
+def _save_rubric_cache() -> None:
+    global _rubric_cache_dirty
+    if not _rubric_cache_dirty:
+        return
+    try:
+        _RUBRIC_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _RUBRIC_CACHE_PATH.write_text(
+            json.dumps(_rubric_disk_cache), encoding="utf-8"
+        )
+        _rubric_cache_dirty = False
+    except OSError:
+        pass
+
+
+_load_rubric_cache()
 
 
 def r1_target_bid_present(action: Action, prior_axtrees: Iterable[str]) -> bool:
@@ -25,11 +61,8 @@ def r2_args_traceable(action: Action, prior_axtrees: Iterable[str]) -> bool:
     if action.target_bid is None and action.fill_text is None:
         return True
 
-    args_total = int(action.target_bid is not None) + int(action.fill_text is not None)
-    if args_total == 0:
-        return True
-
     trace_count = 0
+    args_total = int(action.target_bid is not None) + int(action.fill_text is not None)
     if action.target_bid is not None and target_bid_traceable_to_prior_axtrees(action.target_bid, prior_axtrees):
         trace_count += 1
     if action.fill_text is not None and fill_text_traceable_to_prior_axtrees(action.fill_text, prior_axtrees):
@@ -48,67 +81,6 @@ def r3_consent_precedes_L3(actions: list[Action], levels: list[Level], strict: b
             if not consent_before:
                 return False
     return True
-
-
-def r4_contradiction_stub(plan: list[Action], step_index: int, axtrees: list[str]) -> bool:
-    return True
-
-
-def r5_recovery_identifiable_stub(plan: list[Action], step_index: int, axtrees: list[str]) -> bool:
-    return True
-
-
-@lru_cache(maxsize=1)
-def _gemini_client():
-    from google import genai
-
-    project = os.environ.get("GOOGLE_CLOUD_PROJECT")
-    location = os.environ.get("VERTEX_LOCATION", "us-central1")
-    if not project:
-        raise RuntimeError("GOOGLE_CLOUD_PROJECT must be set for rubric-mode=gemini")
-    return genai.Client(vertexai=True, project=project, location=location)
-
-
-_LAST_CALL_TS = [0.0]
-_MIN_INTERVAL_S = float(os.environ.get("IRRGATE_LLM_MIN_INTERVAL", "1.0"))
-
-
-def _throttle() -> None:
-    import time as _time
-    elapsed = _time.time() - _LAST_CALL_TS[0]
-    if elapsed < _MIN_INTERVAL_S:
-        _time.sleep(_MIN_INTERVAL_S - elapsed)
-    _LAST_CALL_TS[0] = _time.time()
-
-
-def _generate_with_backoff(client, *, model, contents, config, max_retries: int = 6):
-    """Call generate_content with throttling + exponential backoff on 429.
-
-    Returns the response, or None if every retry was exhausted (caller falls back to defaults).
-    Logs 429 retries to stderr so progress is visible.
-    """
-    import sys as _sys
-    import time as _time
-    from google.genai import errors as _gerrors
-
-    delay = 4.0
-    for attempt in range(max_retries):
-        _throttle()
-        try:
-            return client.models.generate_content(model=model, contents=contents, config=config)
-        except _gerrors.ClientError as exc:
-            status_code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
-            is_429 = status_code == 429 or "RESOURCE_EXHAUSTED" in str(exc)
-            if not is_429:
-                raise
-            if attempt == max_retries - 1:
-                print(f"[gemini] 429 final fallback after {max_retries} attempts", file=_sys.stderr, flush=True)
-                return None
-            print(f"[gemini] 429 retry {attempt+1}/{max_retries} sleeping {delay:.0f}s",
-                  file=_sys.stderr, flush=True)
-            _time.sleep(delay)
-            delay = min(delay * 2, 60.0)
-    return None
 
 
 _GEMINI_SYSTEM_PROMPT = (
@@ -138,11 +110,18 @@ def _format_gemini_prompt(plan: list[Action], step_index: int, axtrees: list[str
 
 
 def rubric_llm_check_gemini(plan: list[Action], step_index: int, axtrees: list[str]) -> dict[str, bool]:
-    client = _gemini_client()
-    model = os.environ.get("VERTEX_MODEL", "gemini-2.0-flash")
+    global _rubric_cache_dirty
 
     prompt = _format_gemini_prompt(plan, step_index, axtrees)
-    response = _generate_with_backoff(
+    cache_key = f"{prompt}::{RUBRIC_PROMPT_VERSION}"
+
+    if cache_key in _rubric_disk_cache:
+        return _rubric_disk_cache[cache_key]
+
+    client = get_gemini_client()
+    model = os.environ.get("VERTEX_MODEL", "gemini-2.5-flash")
+
+    response = generate_with_backoff(
         client,
         model=model,
         contents=prompt,
@@ -162,32 +141,30 @@ def rubric_llm_check_gemini(plan: list[Action], step_index: int, axtrees: list[s
         },
     )
     if response is None:
-        return {"R4": True, "R5": True}
-    try:
-        parsed = json.loads(response.text)
-        return {"R4": bool(parsed.get("R4", True)), "R5": bool(parsed.get("R5", True))}
-    except (json.JSONDecodeError, AttributeError, TypeError):
-        return {"R4": True, "R5": True}
+        result: dict[str, bool] = {"R4": True, "R5": True}
+    else:
+        try:
+            parsed = json.loads(response.text)
+            result = {"R4": bool(parsed.get("R4", True)), "R5": bool(parsed.get("R5", True))}
+        except (json.JSONDecodeError, AttributeError, TypeError):
+            result = {"R4": True, "R5": True}
+
+    _rubric_disk_cache[cache_key] = result
+    _rubric_cache_dirty = True
+    _save_rubric_cache()
+    return result
 
 
-def rubric_llm_check(plan: list[Action], step_index: int, axtrees: list[str], mode: str | None = None) -> dict[str, bool]:
-    mode = mode if mode is not None else RUBRIC_MODE
-    if mode == "stub":
-        return {"R4": r4_contradiction_stub(plan, step_index, axtrees), "R5": r5_recovery_identifiable_stub(plan, step_index, axtrees)}
-    if mode == "gemini":
-        return rubric_llm_check_gemini(plan, step_index, axtrees)
-
-    # TODO: implement real LLM checks for R4 and R5 (openai, anthropic).
-    return {"R4": True, "R5": True}
+def rubric_llm_check(plan: list[Action], step_index: int, axtrees: list[str]) -> dict[str, bool]:
+    return rubric_llm_check_gemini(plan, step_index, axtrees)
 
 
-def evaluate_rubric(actions: list[Action], levels: list[Level], axtrees: list[str], regime: Regime, mode: str | None = None) -> dict[str, bool]:
+def evaluate_rubric(actions: list[Action], levels: list[Level], axtrees: list[str], regime: Regime) -> dict[str, bool]:
     """Run rubric checks differentiated by regime.
 
     BYPASS: no rubric (decision handled upstream).
-    LOW:    cheap structural checks (R1, R2) only.
-    MEDIUM: structural + consent (R1, R2, R3) + LLM-backed R4, R5.
-    HIGH:   structural + strict consent (R1, R2, R3-strict) + LLM-backed R4, R5.
+    LOW:    structural + consent (R1, R2, R3) — consent always required when f=1.
+    GATED:  full rubric — R1, R2, R3 + LLM-backed R4, R5.
     """
     if regime == Regime.BYPASS:
         return {}
@@ -203,11 +180,12 @@ def evaluate_rubric(actions: list[Action], levels: list[Level], axtrees: list[st
                 r2_ok = False
         prior_axtrees.append(axtree)
 
-    if regime == Regime.LOW:
-        return {"R1": r1_ok, "R2": r2_ok}
+    r3_ok = r3_consent_precedes_L3(actions, levels)
 
-    r3_ok = r3_consent_precedes_L3(actions, levels, strict=(regime == Regime.HIGH))
-    llm_results = rubric_llm_check(actions, len(actions) - 1, axtrees, mode=mode)
+    if regime == Regime.LOW:
+        return {"R1": r1_ok, "R2": r2_ok, "R3": r3_ok}
+
+    llm_results = rubric_llm_check(actions, len(actions) - 1, axtrees)
     return {
         "R1": r1_ok,
         "R2": r2_ok,

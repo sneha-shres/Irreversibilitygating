@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
+from irrgate.actions import Action
+from irrgate.classifier import classify
 from irrgate.config import Config
 from irrgate.data.loader import Trajectory
-from irrgate.gate import GateDecision, gate_step
+from irrgate.gate import GateDecision, make_gate_decision
+from irrgate.taxonomy import Level
 
 
 @dataclass
@@ -17,18 +19,32 @@ class TrajectoryResult:
 
 
 def evaluate_trajectory(trajectory: Trajectory, config: Config) -> TrajectoryResult:
-    """For each step in the trajectory, run gate_step and collect decisions."""
+    """Evaluate each step incrementally, classifying each action exactly once."""
     step_decisions: list[GateDecision] = []
     first_blocking_step: int | None = None
 
-    for step_index in range(len(trajectory.steps)):
-        decision = gate_step(trajectory, step_index, config)
+    actions: list[Action] = []
+    levels: list[Level] = []
+    axtrees: list[str] = []
+    prior_axtrees: list[str] = []
+
+    for step_index, step in enumerate(trajectory.steps):
+        action = Action.from_step(step, step_index=step_index)
+        level = classify(action, prior_axtrees=prior_axtrees)
+        axtree = str(step.get("axtree", ""))
+
+        actions.append(action)
+        levels.append(level)
+        axtrees.append(axtree)
+        prior_axtrees.append(axtree)
+
+        decision = make_gate_decision(actions, levels, axtrees, config)
         step_decisions.append(decision)
 
-        if decision.decision == "block" and first_blocking_step is None:
+        if decision.decision == "block":
             first_blocking_step = step_index
+            break
 
-    # Reached completion if no blocking occurred
     reached_completion = first_blocking_step is None
 
     return TrajectoryResult(

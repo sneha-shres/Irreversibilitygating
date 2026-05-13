@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from irrgate.actions import Action
 from irrgate.rubric import (
     evaluate_rubric,
@@ -131,14 +133,15 @@ def test_r3_false_without_consent():
     assert not r3_consent_precedes_L3(actions, [Level.L3])
 
 
-def test_rubric_llm_check_stub_returns_true():
+def test_rubric_llm_check_returns_r4_r5():
     actions = [make_action("click('1976')")]
-    results = rubric_llm_check(actions, 0, [""])
+    with patch("irrgate.rubric.rubric_llm_check_gemini", return_value={"R4": True, "R5": True}):
+        results = rubric_llm_check(actions, 0, [""])
     assert results["R4"] is True
     assert results["R5"] is True
 
 
-def test_evaluate_rubric_medium_requires_r1_r2_r3():
+def test_evaluate_rubric_low_includes_r3():
     actions = [
         Action(
             action_type="send_msg_to_user",
@@ -167,16 +170,38 @@ def test_evaluate_rubric_medium_requires_r1_r2_r3():
         actions,
         [Level.L0, Level.L3],
         ["[1976] role='button' name='Submit'", "[1976] role='button' name='Submit'"],
-        Regime.MEDIUM,
+        Regime.LOW,
     )
-    assert verdict["R1"]
-    assert verdict["R2"]
-    assert verdict["R3"]
-    assert verdict["R4"]
-    assert verdict["R5"]
+    assert set(verdict.keys()) == {"R1", "R2", "R3"}
+    assert verdict["R3"] is True
 
 
-def test_evaluate_rubric_high_requires_consent_strict_stub():
+def test_evaluate_rubric_low_r3_fails_without_consent():
+    actions = [
+        Action(
+            action_type="click",
+            raw="click('1976')",
+            target_bid="1976",
+            fill_text=None,
+            target_url=None,
+            target_element_text=None,
+            page_url="",
+            reasoning="",
+            step_index=0,
+        ),
+    ]
+    verdict = evaluate_rubric(
+        actions,
+        [Level.L3],
+        ["[1976] role='button' name='Submit'"],
+        Regime.LOW,
+    )
+    assert verdict["R3"] is False
+    assert "R4" not in verdict
+    assert "R5" not in verdict
+
+
+def test_evaluate_rubric_gated_requires_r1_r2_r3_r4_r5():
     actions = [
         Action(
             action_type="send_msg_to_user",
@@ -201,12 +226,39 @@ def test_evaluate_rubric_high_requires_consent_strict_stub():
             step_index=1,
         ),
     ]
-    verdict = evaluate_rubric(
-        actions,
-        [Level.L0, Level.L3],
-        ["", "[1976] role='button' name='Submit'"],
-        Regime.HIGH,
-    )
+    with patch("irrgate.rubric.rubric_llm_check_gemini", return_value={"R4": True, "R5": True}):
+        verdict = evaluate_rubric(
+            actions,
+            [Level.L0, Level.L3],
+            ["[1976] role='button' name='Submit'", "[1976] role='button' name='Submit'"],
+            Regime.GATED,
+        )
+    assert verdict["R1"]
+    assert verdict["R2"]
     assert verdict["R3"]
     assert verdict["R4"]
     assert verdict["R5"]
+
+
+def test_evaluate_rubric_gated_r3_fails_without_consent():
+    actions = [
+        Action(
+            action_type="click",
+            raw="click('1976')",
+            target_bid="1976",
+            fill_text=None,
+            target_url=None,
+            target_element_text=None,
+            page_url="",
+            reasoning="",
+            step_index=0,
+        ),
+    ]
+    with patch("irrgate.rubric.rubric_llm_check_gemini", return_value={"R4": True, "R5": True}):
+        verdict = evaluate_rubric(
+            actions,
+            [Level.L3],
+            ["[1976] role='button' name='Submit'"],
+            Regime.GATED,
+        )
+    assert not verdict["R3"]

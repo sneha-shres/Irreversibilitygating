@@ -10,124 +10,125 @@ import pandas as pd
 from irrgate.data.loader import Trajectory
 from irrgate.data.sampler import build_eval_set, save_eval_set
 
+QWEN = "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct"
+GPT4 = "GenericAgent-gpt-4o-2024-11-20"
 
-def make_trajectory(task_id: str, side_effect: str, steps: list[dict] | None = None) -> Trajectory:
-    if steps is None:
-        steps = [{"action": "noop()", "axtree": "", "url": "", "reasoning": "", "bounding_boxes": []}]
+
+def make_trajectory(task_id: str, side_effect: str, model: str = QWEN) -> Trajectory:
     return Trajectory(
         benchmark="webarena",
         task_id=task_id,
-        model="gpt-4",
+        model=model,
         goal="Test",
-        steps=steps,
+        steps=[{"action": "noop()", "axtree": "", "url": "", "reasoning": "", "bounding_boxes": []}],
         side_effect_label=side_effect,
     )
 
 
+def _write_trajectory_file(tmpdir: str, benchmark: str, model: str, task_id: str, side_effect: str) -> None:
+    """Write a trajectory file at the expected cleaned/{benchmark}/{model}/ path."""
+    path = Path(tmpdir) / "cleaned" / benchmark / model / f"{task_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump({
+            "goal": "Test",
+            "steps": [{"action": "noop()", "axtree": "", "url": "", "reasoning": "", "bounding_boxes": []}],
+            "trajectory_side_effect": side_effect,
+        }, f)
+
+
 def test_build_eval_set_returns_correct_positives_and_negatives():
     annotations = pd.DataFrame([
-        {"benchmark": "WebArena", "task_id": "pos1", "model": "gpt-4", "trajectory_side_effect": "Yes"},
-        {"benchmark": "WebArena", "task_id": "pos2", "model": "gpt-4", "trajectory_side_effect": "Yes"},
-        {"benchmark": "WebArena", "task_id": "neg1", "model": "gpt-4", "trajectory_side_effect": "No"},
-        {"benchmark": "WebArena", "task_id": "neg2", "model": "gpt-4", "trajectory_side_effect": "No"},
-        {"benchmark": "Other", "task_id": "other", "model": "gpt-4", "trajectory_side_effect": "Yes"},
+        {"benchmark": "webarena", "task_id": "pos1", "model": QWEN, "trajectory_side_effect": "Yes"},
+        {"benchmark": "webarena", "task_id": "pos2", "model": QWEN, "trajectory_side_effect": "Yes"},
+        {"benchmark": "webarena", "task_id": "neg1", "model": QWEN, "trajectory_side_effect": "No"},
+        {"benchmark": "webarena", "task_id": "neg2", "model": QWEN, "trajectory_side_effect": "No"},
+        {"benchmark": "other",    "task_id": "other", "model": QWEN, "trajectory_side_effect": "Yes"},
     ])
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Create trajectory files
-        for row in annotations.itertuples():
-            if row.benchmark.lower() in {"webarena", "workarena"}:
-                path = Path(tmpdir) / f"{row.task_id}.json"
-                trajectory = make_trajectory(row.task_id, row.trajectory_side_effect)
-                with open(path, "w") as f:
-                    json.dump({
-                        "goal": trajectory.goal,
-                        "steps": trajectory.steps,
-                        "trajectory_side_effect": trajectory.side_effect_label,
-                    }, f)
+        for _, row in annotations.iterrows():
+            if row["benchmark"] in {"webarena", "workarena"}:
+                _write_trajectory_file(tmpdir, row["benchmark"], row["model"], row["task_id"], row["trajectory_side_effect"])
 
-        positives, negatives = build_eval_set(annotations, tmpdir, n_negatives_per_pos=1, seed=42)
+        positives, negatives = build_eval_set(annotations, tmpdir)
 
         assert len(positives) == 2
         assert all(p.side_effect_label == "Yes" for p in positives)
-        assert len(negatives) == 2  # 2 positives * 1 negative per positive
+        assert len(negatives) == 2
         assert all(n.side_effect_label == "No" for n in negatives)
 
 
-def test_build_eval_set_stratifies_negatives():
-    # Create trajectories: some with irreversible actions, some without
-    irreversible_steps = [{"action": "click('100')", "axtree": "[100] role='button' name='Submit'", "url": "", "reasoning": "", "bounding_boxes": []}]
-    reversible_steps = [{"action": "noop()", "axtree": "", "url": "", "reasoning": "", "bounding_boxes": []}]
-
+def test_build_eval_set_deduplicates_multi_annotator_runs():
+    """Same (task_id, model) annotated twice: should appear once, positive if any Yes."""
     annotations = pd.DataFrame([
-        {"benchmark": "WebArena", "task_id": "pos1", "model": "gpt-4", "trajectory_side_effect": "Yes"},
-        {"benchmark": "WebArena", "task_id": "neg_irrev", "model": "gpt-4", "trajectory_side_effect": "No"},
-        {"benchmark": "WebArena", "task_id": "neg_rev", "model": "gpt-4", "trajectory_side_effect": "No"},
+        {"benchmark": "webarena", "task_id": "t1", "model": QWEN, "trajectory_side_effect": "Yes"},
+        {"benchmark": "webarena", "task_id": "t1", "model": QWEN, "trajectory_side_effect": "No"},
+        {"benchmark": "webarena", "task_id": "t2", "model": QWEN, "trajectory_side_effect": "No"},
+        {"benchmark": "webarena", "task_id": "t2", "model": QWEN, "trajectory_side_effect": "No"},
     ])
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        # Positives
-        path = Path(tmpdir) / "pos1.json"
-        trajectory = make_trajectory("pos1", "Yes", reversible_steps)
-        with open(path, "w") as f:
-            json.dump({
-                "goal": trajectory.goal,
-                "steps": trajectory.steps,
-                "trajectory_side_effect": trajectory.side_effect_label,
-            }, f)
+        _write_trajectory_file(tmpdir, "webarena", QWEN, "t1", "Yes")
+        _write_trajectory_file(tmpdir, "webarena", QWEN, "t2", "No")
 
-        # Irreversible negative
-        path = Path(tmpdir) / "neg_irrev.json"
-        trajectory = make_trajectory("neg_irrev", "No", irreversible_steps)
-        with open(path, "w") as f:
-            json.dump({
-                "goal": trajectory.goal,
-                "steps": trajectory.steps,
-                "trajectory_side_effect": trajectory.side_effect_label,
-            }, f)
-
-        # Reversible negative
-        path = Path(tmpdir) / "neg_rev.json"
-        trajectory = make_trajectory("neg_rev", "No", reversible_steps)
-        with open(path, "w") as f:
-            json.dump({
-                "goal": trajectory.goal,
-                "steps": trajectory.steps,
-                "trajectory_side_effect": trajectory.side_effect_label,
-            }, f)
-
-        positives, negatives = build_eval_set(annotations, tmpdir, n_negatives_per_pos=1, seed=42)
+        positives, negatives = build_eval_set(annotations, tmpdir)
 
         assert len(positives) == 1
+        assert positives[0].task_id == "t1"
         assert len(negatives) == 1
-        # Should prefer the irreversible negative
-        assert negatives[0].task_id == "neg_irrev"
+        assert negatives[0].task_id == "t2"
+
+
+def test_build_eval_set_treats_same_task_different_model_as_distinct_runs():
+    """Same task_id run by two models = two independent trajectories."""
+    annotations = pd.DataFrame([
+        {"benchmark": "webarena", "task_id": "t1", "model": QWEN,  "trajectory_side_effect": "Yes"},
+        {"benchmark": "webarena", "task_id": "t1", "model": GPT4,  "trajectory_side_effect": "No"},
+    ])
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _write_trajectory_file(tmpdir, "webarena", QWEN, "t1", "Yes")
+        _write_trajectory_file(tmpdir, "webarena", GPT4, "t1", "No")
+
+        positives, negatives = build_eval_set(annotations, tmpdir)
+
+        assert len(positives) == 1
+        assert positives[0].model == QWEN
+        assert len(negatives) == 1
+        assert negatives[0].model == GPT4
+
+
+def test_build_eval_set_excludes_runs_without_trajectory_file():
+    annotations = pd.DataFrame([
+        {"benchmark": "webarena", "task_id": "has_file",    "model": QWEN, "trajectory_side_effect": "Yes"},
+        {"benchmark": "webarena", "task_id": "missing_file","model": QWEN, "trajectory_side_effect": "Yes"},
+    ])
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        _write_trajectory_file(tmpdir, "webarena", QWEN, "has_file", "Yes")
+        # no file for missing_file
+
+        positives, negatives = build_eval_set(annotations, tmpdir)
+
+        assert len(positives) == 1
+        assert positives[0].task_id == "has_file"
 
 
 def test_build_eval_set_is_deterministic():
     annotations = pd.DataFrame([
-        {"benchmark": "WebArena", "task_id": "pos1", "model": "gpt-4", "trajectory_side_effect": "Yes"},
-        {"benchmark": "WebArena", "task_id": "neg1", "model": "gpt-4", "trajectory_side_effect": "No"},
-        {"benchmark": "WebArena", "task_id": "neg2", "model": "gpt-4", "trajectory_side_effect": "No"},
+        {"benchmark": "webarena", "task_id": "pos1", "model": QWEN, "trajectory_side_effect": "Yes"},
+        {"benchmark": "webarena", "task_id": "neg1", "model": QWEN, "trajectory_side_effect": "No"},
+        {"benchmark": "webarena", "task_id": "neg2", "model": QWEN, "trajectory_side_effect": "No"},
     ])
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        for row in annotations.itertuples():
-            path = Path(tmpdir) / f"{row.task_id}.json"
-            trajectory = make_trajectory(row.task_id, row.trajectory_side_effect)
-            with open(path, "w") as f:
-                json.dump({
-                    "goal": trajectory.goal,
-                    "steps": trajectory.steps,
-                    "trajectory_side_effect": trajectory.side_effect_label,
-                }, f)
+        for _, row in annotations.iterrows():
+            _write_trajectory_file(tmpdir, row["benchmark"], row["model"], row["task_id"], row["trajectory_side_effect"])
 
-        # Run twice with same seed
-        pos1, neg1 = build_eval_set(annotations, tmpdir, seed=42)
-        pos2, neg2 = build_eval_set(annotations, tmpdir, seed=42)
+        pos1, neg1 = build_eval_set(annotations, tmpdir)
+        pos2, neg2 = build_eval_set(annotations, tmpdir)
 
-        assert len(pos1) == len(pos2)
-        assert len(neg1) == len(neg2)
         assert [p.task_id for p in pos1] == [p.task_id for p in pos2]
         assert [n.task_id for n in neg1] == [n.task_id for n in neg2]
 
