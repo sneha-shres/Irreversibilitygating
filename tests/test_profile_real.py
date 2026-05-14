@@ -1,10 +1,10 @@
-"""Profile + routing tests against real cached trajectories.
+"""Profile tests against real cached trajectories.
 
 Four trajectories chosen for distinct structural properties:
-  1. knowledge-base-search/llama  — all L0/L1, 7 steps  (BYPASS gap)
+  1. knowledge-base-search/llama  — all L0/L1, 7 steps  (f=0 throughout)
   2. webarena.666/Qwen            — single L3 at step 0, 31 steps
   3. create-problem/gpt-4o        — dense alternating L1/L3, 31 steps
-  4. webarena.788/gpt-4o          — 3 steps all L0 (shortest BYPASS)
+  4. webarena.788/gpt-4o          — 3 steps all L0
 
 Plus three isolated edge-case unit tests for the π denominator.
 """
@@ -19,7 +19,6 @@ import pytest
 from irrgate.actions import Action
 from irrgate.data.loader import load_trajectory
 from irrgate.profile import RiskProfile, compute_risk_profile
-from irrgate.routing import Regime, route
 from irrgate.taxonomy import Level
 
 # ---------------------------------------------------------------------------
@@ -47,7 +46,7 @@ def _find_traj_file(task_id: str, model_frag: str) -> str:
 
 
 def _build_prefix(task_id: str, model_frag: str, traj_id: str):
-    """Return (actions, levels, axtrees) for every step of the trajectory."""
+    """Return (actions, levels) for every step of the trajectory."""
     path = _find_traj_file(task_id, model_frag)
     traj = load_trajectory(path)
     rows = _cache()[_cache()["trajectory_id"] == traj_id].sort_values("step_index")
@@ -56,15 +55,14 @@ def _build_prefix(task_id: str, model_frag: str, traj_id: str):
         f"Cache has {len(cached_levels)} rows but trajectory has {len(traj.steps)} steps"
     )
     actions = [Action.from_step(s, step_index=i) for i, s in enumerate(traj.steps)]
-    axtrees = [str(s.get("axtree", "")) for s in traj.steps]
-    return actions, cached_levels, axtrees
+    return actions, cached_levels
 
 
-def _profiles_at_all_steps(actions, levels, axtrees):
+def _profiles_at_all_steps(actions, levels):
     """Compute cumulative profile at every step index."""
     profiles = []
     for k in range(len(actions)):
-        p = compute_risk_profile(levels[: k + 1], actions[: k + 1], axtrees[: k + 1])
+        p = compute_risk_profile(levels[: k + 1], actions[: k + 1])
         profiles.append(p)
     return profiles
 
@@ -95,44 +93,35 @@ def _make_action(
 def test_pi_zero_when_W_is_zero():
     """All L0/L1 → total_weight=0 → π must be exactly 0."""
     actions = [_make_action(target_bid=str(i)) for i in range(5)]
-    p = compute_risk_profile([Level.L0] * 5, actions, [""] * 5)
+    p = compute_risk_profile([Level.L0] * 5, actions)
     assert p.f == 0
     assert p.d_I == 0.0
     assert p.pi == 0.0
 
 
-def test_pi_args_total_zero_uses_trace_fallback():
-    """L3 with no bid and no fill_text → args_total=0 → trace_term=1.0 fallback.
-
-    distinct_bids is also 0 (no bid in any step) → bid_term=1.0 fallback.
-    u_i = 1.0 → weighted_residual = 1.0*(1-1.0) = 0 → π = 0.
-    """
+def test_pi_no_bid_L3_fully_covered():
+    """L3 with no bid → distinct_bids_in_full_plan=0 → bid_term fallback 1.0 → u_i=1.0 → π=0."""
     a = _make_action(action_type="None", target_bid=None, fill_text=None,
                      page_url="https://example.com/checkout/")
-    p = compute_risk_profile([Level.L3], [a], [""])
+    p = compute_risk_profile([Level.L3], [a])
     assert p.f == 1
     assert p.d_I == pytest.approx(1.0)
-    assert p.pi == pytest.approx(0.0)   # fully covered by the two fallbacks
+    assert p.pi == pytest.approx(0.0)
 
 
-def test_pi_fill_only_L3_untraced():
-    """L3 with fill_text but no bid, fill not seen in prior axtrees.
-
-    args_total=1, trace_count=0 → trace_term=0.
-    distinct_bids=0 → bid_term=1.0 fallback.
-    u_i = 0.5 → weighted_residual = 0.5 → π = 0.5.
-    """
+def test_pi_fill_only_L3_no_bid():
+    """L3 with fill_text but no bid → distinct_bids=0 → bid_term=1.0 → u_i=1.0 → π=0."""
     a = _make_action(action_type="select_option", target_bid=None, fill_text="Delete")
-    p = compute_risk_profile([Level.L3], [a], [""])
+    p = compute_risk_profile([Level.L3], [a])
     assert p.f == 1
     assert p.d_I == pytest.approx(1.0)
-    assert p.pi == pytest.approx(0.5)
+    assert p.pi == pytest.approx(0.0)
 
 
-def test_pi_first_step_L3_no_prior_axtrees():
-    """L3 at step 0 (empty prior axtrees): bid unseen, trace_term=0, bid_term=0 → u=0 → π=1."""
+def test_pi_first_step_L3_unseen_bid():
+    """L3 at step 0: bid not in seen_bids yet → bid_term=0 → u_i=0 → π=1."""
     a = _make_action(target_bid="1976")
-    p = compute_risk_profile([Level.L3], [a], [""])
+    p = compute_risk_profile([Level.L3], [a])
     assert p.f == 1
     assert p.d_I == pytest.approx(1.0)
     assert p.pi == pytest.approx(1.0)
@@ -147,12 +136,12 @@ BYPASS_TRAJ = "workarena.servicenow.knowledge-base-search::GenericAgent-meta-lla
 
 @pytest.fixture(scope="module")
 def bypass_profiles():
-    actions, levels, axtrees = _build_prefix(
+    actions, levels = _build_prefix(
         "workarena.servicenow.knowledge-base-search",
         "Llama-3.3-70B-Instruct",
         BYPASS_TRAJ,
     )
-    return _profiles_at_all_steps(actions, levels, axtrees), levels
+    return _profiles_at_all_steps(actions, levels), levels
 
 
 def test_bypass_traj_f_always_zero(bypass_profiles):
@@ -170,12 +159,6 @@ def test_bypass_traj_pi_always_zero(bypass_profiles):
     assert all(p.pi == pytest.approx(0.0) for p in profiles)
 
 
-def test_bypass_traj_routes_to_bypass(bypass_profiles):
-    profiles, _ = bypass_profiles
-    for p in profiles:
-        assert route(p) == Regime.BYPASS
-
-
 # ---------------------------------------------------------------------------
 # Real trajectory 2: webarena.666 / Qwen — single L3 at step 0
 # ---------------------------------------------------------------------------
@@ -185,14 +168,14 @@ SINGLE_L3_TRAJ = "webarena.666::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct"
 
 @pytest.fixture(scope="module")
 def single_l3_profiles():
-    actions, levels, axtrees = _build_prefix(
+    actions, levels = _build_prefix(
         "webarena.666", "Qwen_Qwen2.5-VL-72B-Instruct", SINGLE_L3_TRAJ
     )
-    return _profiles_at_all_steps(actions, levels, axtrees), levels
+    return _profiles_at_all_steps(actions, levels), levels
 
 
 def test_single_l3_step0_profile(single_l3_profiles):
-    """Step 0 is L3 with no prior axtrees → d_I=1, π=1."""
+    """Step 0 is L3 with no prior BIDs seen → bid_term=0 → u_i=0 → d_I=1, π=1."""
     profiles, levels = single_l3_profiles
     assert levels[0] == Level.L3
     p0 = profiles[0]
@@ -210,10 +193,8 @@ def test_single_l3_d_I_dilutes_over_time(single_l3_profiles):
 
 
 def test_single_l3_pi_stays_pinned_at_one(single_l3_profiles):
-    """π stays at 1.0 after step 0: the L3 was ungrounded and R stays ungrounded forever."""
+    """π stays at 1.0: the L3 targeted a BID not seen before; L1 steps add 0 weight."""
     profiles, _ = single_l3_profiles
-    # Every step after the first has the same weighted_residual / total_weight because
-    # L1 steps contribute severity=0 and don't change the numerator or denominator.
     for p in profiles:
         assert p.pi == pytest.approx(1.0), f"π drifted: {p.pi}"
 
@@ -226,18 +207,6 @@ def test_single_l3_d_I_monotone_decreasing(single_l3_profiles):
         assert curr <= prev + 1e-9, f"d_I increased: {prev} → {curr}"
 
 
-def test_single_l3_routes_to_low_before_dilution(single_l3_profiles):
-    """At step 0, d_I=1 and π=1 → GATED regime at default thresholds."""
-    profiles, _ = single_l3_profiles
-    assert route(profiles[0], tau_d=0.15, tau_pi=0.30) == Regime.GATED
-
-
-def test_single_l3_routes_to_low_after_dilution(single_l3_profiles):
-    """At step 30, d_I≈0.032 < τ_d=0.15 but π=1.0 ≥ τ_π=0.30 → GATED."""
-    profiles, _ = single_l3_profiles
-    assert route(profiles[-1], tau_d=0.15, tau_pi=0.30) == Regime.GATED
-
-
 # ---------------------------------------------------------------------------
 # Real trajectory 3: create-problem / gpt-4o — dense alternating L1/L3
 # ---------------------------------------------------------------------------
@@ -247,10 +216,10 @@ DENSE_TRAJ = "workarena.servicenow.create-problem::GenericAgent-gpt-4o-2024-11-2
 
 @pytest.fixture(scope="module")
 def dense_profiles():
-    actions, levels, axtrees = _build_prefix(
+    actions, levels = _build_prefix(
         "workarena.servicenow.create-problem", "gpt-4o-2024-11-20", DENSE_TRAJ
     )
-    return _profiles_at_all_steps(actions, levels, axtrees), levels
+    return _profiles_at_all_steps(actions, levels), levels
 
 
 def test_dense_traj_f_zero_before_first_L3(dense_profiles):
@@ -273,9 +242,9 @@ def test_dense_traj_step3_d_I(dense_profiles):
 
 
 def test_dense_traj_step3_pi(dense_profiles):
-    """At step 3 (first L3): verified value 0.625 from live run."""
+    """At step 3 (first L3, bid=a490): 3 distinct BIDs seen before → bid_term=3/4 → u_i=0.75 → π=0.25."""
     profiles, _ = dense_profiles
-    assert profiles[3].pi == pytest.approx(0.625, rel=1e-3)
+    assert profiles[3].pi == pytest.approx(0.25, rel=1e-3)
 
 
 def test_dense_traj_final_d_I(dense_profiles):

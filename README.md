@@ -15,10 +15,10 @@ classify trajectory-so-far by reversibility level (L0–L3)
         ↓
 compute risk profile (f, d_I, π)
         ↓
-route to regime (BYPASS / LOW / GATED)
-        ↓
-evaluate safety rubric (R1–R5) → approve or block
+gate_decision(profile, τ_d, τ_π) → approve or block
 ```
+
+**Gate policy (disjunction):** block iff `f=1` and (`d_I ≥ τ_d` or `π ≥ τ_π`). No LLM at gate time.
 
 In the retrospective evaluation, completed trajectories are replayed to determine at which step IrrGate would have intervened.
 
@@ -52,15 +52,13 @@ python scripts/run_evaluation.py \
   --trajectory-dir data/raw \
   --tau-d 0.1 \
   --tau-pi 0.3 \
-  --rubric-mode gemini \
   --output-dir results/my_run
 ```
 
 Options:
-- `--tau-d`: d_I threshold separating LOW from GATED (default 0.15)
-- `--tau-pi`: π threshold separating LOW from GATED (default 0.30)
-- `--rubric-mode`: `gemini` (default, LLM stage-2 via Vertex AI)
-- `--run-ablation`: Include ablation study comparing config variants
+- `--tau-d`: d_I threshold (default 0.15)
+- `--tau-pi`: π threshold (default 0.30)
+- `--ablation-variant`: `f_only` | `f_plus_d` | `f_plus_pi` | `disjunction` | `conjunction` | `full`
 - `--output-dir`: Output directory (default `results/{date}/`)
 - `--no-resume`: Ignore existing progress and restart from scratch
 
@@ -87,18 +85,16 @@ irrgate/
 ├── irrgate/              # Core package
 │   ├── actions.py        # Action parsing and representation
 │   ├── classifier.py     # Stage-1 rules + stage-2 LLM fallback (L0–L3)
-│   ├── config.py         # Hyperparameters (ALPHA, TAU_D, TAU_PI, RUBRIC_MODE)
-│   ├── gate.py           # End-to-end per-step gating logic
+│   ├── config.py         # Hyperparameters (ALPHA, TAU_D, TAU_PI)
+│   ├── gate.py           # gate_decision(profile, tau_d, tau_pi): block/approve
 │   ├── profile.py        # Risk profile: f, d_I, π
-│   ├── routing.py        # Regime routing (BYPASS/LOW/GATED)
-│   ├── rubric.py         # Safety rubric R1–R5
 │   ├── taxonomy.py       # Level definitions and severity weights
 │   ├── data/             # Data loading utilities
 │   └── evaluation/       # Metrics, runner, analysis
 ├── scripts/
 │   ├── download_data.py  # Pull AgentRewardBench from HuggingFace
 │   ├── build_eval_set.py # Build stratified eval set
-│   └── run_evaluation.py # Main entry point
+│   └── run_evaluation.py # Main entry point (five ablation variants)
 ├── tests/                # Unit tests (pytest)
 └── pyproject.toml
 ```
@@ -109,4 +105,4 @@ irrgate/
 pytest tests/
 ```
 
-66 tests pass. 2 pre-existing failures in `test_loader` are unrelated to core gating logic.
+2 pre-existing failures in `test_loader` are unrelated to core gating logic.

@@ -30,6 +30,8 @@ import irrgate.config  # noqa: F401 — triggers .env loading at import time
 from irrgate.actions import Action
 from irrgate.classifier import CLASSIFIER_VERSION, classify_with_details
 from irrgate.data.loader import load_trajectory
+from irrgate.profile import compute_risk_profile
+from irrgate.taxonomy import Level
 
 
 def find_trajectory_file(task_id: str, trajectory_dir: str, model: str | None = None) -> str:
@@ -61,6 +63,7 @@ def _make_dataframe(rows: list[dict]) -> pd.DataFrame:
             "stage1_level", "stage2_level", "final_level", "stage_used",
             "stage2_raw_response", "stage2_model", "stage2_prompt_version",
             "classifier_version",
+            "f", "d_I", "pi",
         ])
     df = pd.DataFrame(rows)
     df["step_index"] = df["step_index"].astype("int16")
@@ -68,6 +71,7 @@ def _make_dataframe(rows: list[dict]) -> pd.DataFrame:
     df["stage_used"] = df["stage_used"].astype("int8")
     df["stage1_level"] = df["stage1_level"].astype(pd.Int8Dtype())
     df["stage2_level"] = df["stage2_level"].astype(pd.Int8Dtype())
+    df["f"] = df["f"].astype("int8")
     return df
 
 
@@ -124,9 +128,17 @@ def build(
             continue
 
         t0 = time.time()
+        traj_actions: list[Action] = []
+        traj_levels: list[Level] = []
+        traj_axtrees: list[str] = []
         for step_index, step in enumerate(traj.steps):
             action = Action.from_step(step, step_index=step_index)
             result = classify_with_details(action)
+            axtree = str(step.get("axtree", ""))
+            traj_actions.append(action)
+            traj_levels.append(result.final_level)
+            traj_axtrees.append(axtree)
+            profile = compute_risk_profile(traj_levels, traj_actions, traj_axtrees)
             buffer.append({
                 "trajectory_id": traj_id,
                 "step_index": step_index,
@@ -142,6 +154,9 @@ def build(
                 "stage2_model": result.stage2_model,
                 "stage2_prompt_version": result.stage2_prompt_version,
                 "classifier_version": result.classifier_version,
+                "f": profile.f,
+                "d_I": profile.d_I,
+                "pi": profile.pi,
             })
 
         elapsed = time.time() - t0

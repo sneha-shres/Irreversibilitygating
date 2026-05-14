@@ -25,20 +25,15 @@ def evaluate_trajectory(trajectory: Trajectory, config: Config) -> TrajectoryRes
 
     actions: list[Action] = []
     levels: list[Level] = []
-    axtrees: list[str] = []
-    prior_axtrees: list[str] = []
 
     for step_index, step in enumerate(trajectory.steps):
         action = Action.from_step(step, step_index=step_index)
-        level = classify(action, prior_axtrees=prior_axtrees)
-        axtree = str(step.get("axtree", ""))
+        level = classify(action)
 
         actions.append(action)
         levels.append(level)
-        axtrees.append(axtree)
-        prior_axtrees.append(axtree)
 
-        decision = make_gate_decision(actions, levels, axtrees, config)
+        decision = make_gate_decision(actions, levels, config)
         step_decisions.append(decision)
 
         if decision.decision == "block":

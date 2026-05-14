@@ -43,3 +43,4 @@ def save_settings(updates: dict) -> None:
 class Config:
     tau_d: float = TAU_D
     tau_pi: float = TAU_PI
+    use_conjunction: bool = False  # if True, block iff f=1 AND d_I>=tau_d AND pi>=tau_pi

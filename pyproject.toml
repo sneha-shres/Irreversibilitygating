@@ -13,5 +13,5 @@ dependencies = [
   "pyarrow>=12.0.0",
 ]
 
-[tool.pytest]
-addopts = "-q"
+[tool.pytest.ini_options]
+addopts = ["-q"]

@@ -6,8 +6,6 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterable
-
 from irrgate._gemini import generate_with_backoff, get_gemini_client
 from irrgate.actions import Action
 from irrgate.taxonomy import Level
@@ -167,7 +165,7 @@ def _classify_stage2_gemini_cached(prompt: str) -> tuple[Level, str | None]:
             pass
 
     client = get_gemini_client()
-    model = os.environ.get("VERTEX_MODEL", "gemini-2.0-flash")
+    model = os.environ.get("VERTEX_MODEL", "gemini-2.5-flash")
     response = generate_with_backoff(
         client,
         model=model,
@@ -201,14 +199,12 @@ def _classify_stage2_gemini_cached(prompt: str) -> tuple[Level, str | None]:
     return level, raw
 
 
-def classify_stage2(action: Action, prior_axtrees: Iterable[str] | None = None) -> Level:
+def classify_stage2(action: Action) -> Level:
     level, _ = _classify_stage2_gemini_cached(_stage2_prompt(action))
     return level
 
 
-def classify_with_details(
-    action: Action, prior_axtrees: Iterable[str] | None = None
-) -> ClassificationResult:
+def classify_with_details(action: Action) -> ClassificationResult:
     s1 = classify_stage1(action)
     if s1 is not None:
         return ClassificationResult(
@@ -230,11 +226,11 @@ def classify_with_details(
         final_level=s2,
         stage_used=2,
         stage2_raw_response=raw,
-        stage2_model=os.environ.get("VERTEX_MODEL", "gemini-2.0-flash") if raw is not None else None,
+        stage2_model=os.environ.get("VERTEX_MODEL", "gemini-2.5-flash") if raw is not None else None,
         stage2_prompt_version=_STAGE2_PROMPT_VERSION,
         classifier_version=CLASSIFIER_VERSION,
     )
 
 
-def classify(action: Action, prior_axtrees: Iterable[str] | None = None) -> Level:
-    return classify_with_details(action, prior_axtrees).final_level
+def classify(action: Action) -> Level:
+    return classify_with_details(action).final_level

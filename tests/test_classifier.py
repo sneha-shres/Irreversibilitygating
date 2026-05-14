@@ -86,13 +86,13 @@ def test_classify_ambiguous_click_uses_stage2():
         0,
     )
     with patch("irrgate.classifier._classify_stage2_gemini_cached", return_value=(Level.L1, None)):
-        assert classify(action, prior_axtrees=[]) == Level.L1
+        assert classify(action) == Level.L1
 
 
 def test_stage2_calls_gemini():
     action = Action.from_step(make_step("click('1976')"), 0)
     with patch("irrgate.classifier._classify_stage2_gemini_cached", return_value=(Level.L2, None)) as mock_gemini:
-        result = classify_stage2(action, prior_axtrees=[])
+        result = classify_stage2(action)
         assert result == Level.L2
         mock_gemini.assert_called_once()
 

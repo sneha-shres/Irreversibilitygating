@@ -5,7 +5,6 @@ from irrgate.data.loader import Trajectory
 from irrgate.evaluation.metrics import compute_false_positive_rate, compute_recall
 from irrgate.evaluation.runner import TrajectoryResult, evaluate_trajectory
 from irrgate.gate import GateDecision
-from irrgate.routing import Regime
 
 
 def make_trajectory(steps: list[dict], side_effect: str = "No") -> Trajectory:

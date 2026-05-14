@@ -11,11 +11,9 @@ from typing import Optional
 import pandas as pd
 
 from irrgate.actions import Action
-from irrgate.classifier import classify, classify_stage1
+from irrgate.classifier import classify
 from irrgate.config import Config, load_settings
 from irrgate.data.loader import load_trajectory
-from irrgate.evaluation.analysis import produce_ablation_table, produce_results_table
-from irrgate.evaluation.metrics import per_task_aggregation
 from irrgate.evaluation.runner import evaluate_trajectory
 
 
@@ -66,21 +64,6 @@ def _candidate_side_effect_step(traj) -> Optional[int]:
     return latest
 
 
-_REGIME_RANK = {"bypass": 0, "low": 1, "gated": 2}
-
-
-def _peak_regime(result) -> Optional[str]:
-    peak = None
-    peak_rank = -1
-    for dec in result.step_decisions:
-        name = dec.regime.value
-        rank = _REGIME_RANK.get(name, -1)
-        if rank > peak_rank:
-            peak_rank = rank
-            peak = name
-    return peak
-
-
 def _profile_at_step(result, step: Optional[int]):
     """Return (d_I, pi) from the GateDecision at a given step, or (None, None)."""
     if step is None or step >= len(result.step_decisions):
@@ -90,15 +73,11 @@ def _profile_at_step(result, step: Optional[int]):
 
 
 def _run_key(meta: dict) -> str:
-    return f"{meta['task_id']}::{meta.get('model', '')}"
+    return f"{meta.get('task_id', '')}::{meta.get('model', '')}"
 
 
 def _result_record(meta: dict, traj, result, is_positive: bool) -> dict:
     block_step = result.first_blocking_step
-    regime_at_block = (
-        result.step_decisions[block_step].regime.value
-        if block_step is not None else None
-    )
     side_effect_step = _candidate_side_effect_step(traj)
     d_I_se, pi_se = _profile_at_step(result, side_effect_step)
 
@@ -112,8 +91,6 @@ def _result_record(meta: dict, traj, result, is_positive: bool) -> dict:
         "benchmark": meta.get("benchmark", ""),
         "side_effect_label": meta.get("side_effect_label", ""),
         "first_blocking_step": block_step,
-        "regime_at_block": regime_at_block,
-        "peak_regime": _peak_regime(result),
         "side_effect_step": side_effect_step,
         "n_steps": len(traj.steps),
         "d_I_at_side_effect_step": d_I_se,
@@ -137,7 +114,7 @@ def _load_progress(progress_path: str) -> tuple[list[dict], set[str]]:
                 rec = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            key = f"{rec.get('task_id', '')}::{rec.get('model', '')}"
+            key = _run_key(rec)
             if key in seen:
                 continue
             seen.add(key)
@@ -173,7 +150,6 @@ def _aggregate_from_records(records: list[dict]) -> tuple[pd.DataFrame, dict]:
             "n_positives": len(pos),
             "n_catchable": len(catchable),
             "n_negatives": len(neg),
-            "mvc": 0.0,
         })
     df = pd.DataFrame(rows)
 
@@ -239,13 +215,15 @@ def main() -> None:
     parser.add_argument(
         "--ablation-variant",
         default=None,
-        choices=["f_only", "f_plus_d", "f_plus_pi", "full"],
+        choices=["f_only", "f_plus_d", "f_plus_pi", "disjunction", "conjunction", "full"],
         help=(
-            "Override tau values for ablation. "
-            "f_only: both thresholds disabled (99.0); "
-            "f_plus_d: pi disabled; "
-            "f_plus_pi: d_I disabled; "
-            "full: use --tau-d and --tau-pi as given."
+            "Override tau/policy for ablation. "
+            "f_only: block iff f=1 (thresholds zeroed); "
+            "f_plus_d: block iff f=1 AND d_I>=tau_d (pi disabled); "
+            "f_plus_pi: block iff f=1 AND pi>=tau_pi (d_I disabled); "
+            "disjunction: block iff f=1 AND (d_I>=tau_d OR pi>=tau_pi) [primary policy]; "
+            "conjunction: block iff f=1 AND d_I>=tau_d AND pi>=tau_pi; "
+            "full: alias for disjunction."
         ),
     )
     parser.add_argument(
@@ -256,17 +234,20 @@ def main() -> None:
     args = parser.parse_args()
 
     _DISABLED = 99.0
-    _ABLATION_TAU = {
-        "f_only":    (_DISABLED, _DISABLED),
-        "f_plus_d":  (args.tau_d, _DISABLED),
-        "f_plus_pi": (_DISABLED, args.tau_pi),
-        "full":      (args.tau_d, args.tau_pi),
+    # (tau_d, tau_pi, use_conjunction)
+    _ABLATION_PARAMS: dict[str, tuple[float, float, bool]] = {
+        "f_only":       (0.0,        0.0,         False),
+        "f_plus_d":     (args.tau_d, _DISABLED,   False),
+        "f_plus_pi":    (_DISABLED,  args.tau_pi, False),
+        "disjunction":  (args.tau_d, args.tau_pi, False),
+        "conjunction":  (args.tau_d, args.tau_pi, True),
+        "full":         (args.tau_d, args.tau_pi, False),
     }
 
     if args.ablation_variant is not None:
-        tau_d, tau_pi = _ABLATION_TAU[args.ablation_variant]
+        tau_d, tau_pi, use_conjunction = _ABLATION_PARAMS[args.ablation_variant]
     else:
-        tau_d, tau_pi = args.tau_d, args.tau_pi
+        tau_d, tau_pi, use_conjunction = args.tau_d, args.tau_pi, False
 
     if args.output_dir is None:
         if args.ablation_variant:
@@ -280,6 +261,7 @@ def main() -> None:
     config = Config(
         tau_d=tau_d,
         tau_pi=tau_pi,
+        use_conjunction=use_conjunction,
     )
 
     positives_meta, negatives_meta = load_eval_set(args.eval_set)
@@ -343,7 +325,7 @@ def main() -> None:
     csv_rows = []
     seen = set()
     for r in records:
-        key = f"{r['task_id']}::{r.get('model', '')}"
+        key = _run_key(r)
         if key in seen:
             continue
         seen.add(key)
@@ -353,8 +335,6 @@ def main() -> None:
             "side_effect_label": r["side_effect_label"],
             "irrgate_blocked": r["first_blocking_step"] is not None,
             "irrgate_block_step": r["first_blocking_step"],
-            "regime_at_block": r["regime_at_block"],
-            "peak_regime": r.get("peak_regime"),
             "peak_d_I": r.get("peak_d_I"),
             "peak_pi": r.get("peak_pi"),
             "d_I_at_side_effect_step": r.get("d_I_at_side_effect_step"),
