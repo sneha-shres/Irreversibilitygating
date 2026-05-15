@@ -1,0 +1,437 @@
+[
+  {
+    "trajectory_id": "webarena.710::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "webarena.710",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 1.0,
+    "n_l3_actions": 31,
+    "level_counts": {
+      "L3": 31
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.infeasible-navigate-and-order-apple-watch-with-reason-l2::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "workarena.servicenow.infeasible-navigate-and-order-apple-watch-with-reason-l2",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 10.0,
+    "n_l3_actions": 5,
+    "level_counts": {
+      "L1": 14,
+      "L0": 12,
+      "L3": 5
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.infeasible-navigate-and-order-development-laptop-p-c-with-reason-l2::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "workarena.servicenow.infeasible-navigate-and-order-development-laptop-p-c-with-reason-l2",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 6.0,
+    "n_l3_actions": 2,
+    "level_counts": {
+      "L0": 26,
+      "L1": 3,
+      "L3": 2
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "webarena.778::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "webarena.778",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 3.0,
+    "n_l3_actions": 31,
+    "level_counts": {
+      "L3": 31
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.790::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "task_id": "webarena.790",
+    "model": "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 3.0,
+    "n_l3_actions": 28,
+    "level_counts": {
+      "L3": 28,
+      "L0": 3
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.two-changes-fix-wide-tight-priority-varied-risk-change-request-scheduling-l2::GenericAgent-gpt-4o-2024-11-20",
+    "task_id": "workarena.servicenow.two-changes-fix-wide-tight-priority-varied-risk-change-request-scheduling-l2",
+    "model": "GenericAgent-gpt-4o-2024-11-20",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 11.0,
+    "n_l3_actions": 7,
+    "level_counts": {
+      "L1": 16,
+      "L0": 8,
+      "L3": 7
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.infeasible-navigate-and-order-apple-mac-book-pro15-l2::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "workarena.servicenow.infeasible-navigate-and-order-apple-mac-book-pro15-l2",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 14.0,
+    "n_l3_actions": 9,
+    "level_counts": {
+      "L0": 13,
+      "L1": 9,
+      "L3": 9
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.infeasible-navigate-and-order-development-laptop-p-c-l2::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "workarena.servicenow.infeasible-navigate-and-order-development-laptop-p-c-l2",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 9.0,
+    "n_l3_actions": 4,
+    "level_counts": {
+      "L0": 14,
+      "L1": 13,
+      "L3": 4
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.696::GenericAgent-gpt-4o-2024-11-20",
+    "task_id": "webarena.696",
+    "model": "GenericAgent-gpt-4o-2024-11-20",
+    "benchmark": "webarena",
+    "n_steps": 20,
+    "n_distinct_pages_pre_se": 4.0,
+    "n_l3_actions": 19,
+    "level_counts": {
+      "L3": 19,
+      "L0": 1
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.infeasible-navigate-and-order-apple-watch-l2::GenericAgent-gpt-4o-2024-11-20",
+    "task_id": "workarena.servicenow.infeasible-navigate-and-order-apple-watch-l2",
+    "model": "GenericAgent-gpt-4o-2024-11-20",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 13.0,
+    "n_l3_actions": 7,
+    "level_counts": {
+      "L0": 12,
+      "L1": 12,
+      "L3": 7
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.666::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "webarena.666",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "webarena",
+    "n_steps": 25,
+    "n_distinct_pages_pre_se": 8.0,
+    "n_l3_actions": 2,
+    "level_counts": {
+      "L1": 18,
+      "L0": 3,
+      "L3": 2,
+      "L2": 2
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.infeasible-navigate-and-order-development-laptop-p-c-l2::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "workarena.servicenow.infeasible-navigate-and-order-development-laptop-p-c-l2",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 7.0,
+    "n_l3_actions": 3,
+    "level_counts": {
+      "L0": 25,
+      "L1": 3,
+      "L3": 3
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.343::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "webarena.343",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "webarena",
+    "n_steps": 7,
+    "n_distinct_pages_pre_se": 5.0,
+    "n_l3_actions": 4,
+    "level_counts": {
+      "L3": 4,
+      "L0": 3
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.417::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "webarena.417",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 1.0,
+    "n_l3_actions": 30,
+    "level_counts": {
+      "L3": 30,
+      "L0": 1
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.filter-requested-items-and-order-apple-mac-book-pro15-l2::GenericAgent-gpt-4o-2024-11-20",
+    "task_id": "workarena.servicenow.filter-requested-items-and-order-apple-mac-book-pro15-l2",
+    "model": "GenericAgent-gpt-4o-2024-11-20",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 5.0,
+    "n_l3_actions": 2,
+    "level_counts": {
+      "L1": 18,
+      "L0": 11,
+      "L3": 2
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.on-board-user-l2::GenericAgent-gpt-4o-2024-11-20",
+    "task_id": "workarena.servicenow.on-board-user-l2",
+    "model": "GenericAgent-gpt-4o-2024-11-20",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 6.0,
+    "n_l3_actions": 12,
+    "level_counts": {
+      "L3": 12,
+      "L0": 9,
+      "L1": 9,
+      "L2": 1
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.778::GenericAgent-gpt-4o-2024-11-20",
+    "task_id": "webarena.778",
+    "model": "GenericAgent-gpt-4o-2024-11-20",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 3.0,
+    "n_l3_actions": 31,
+    "level_counts": {
+      "L3": 31
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.416::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "webarena.416",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 4.0,
+    "n_l3_actions": 19,
+    "level_counts": {
+      "L3": 19,
+      "L0": 8,
+      "L1": 4
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.filter-requested-items-and-order-apple-mac-book-pro15-l2::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "workarena.servicenow.filter-requested-items-and-order-apple-mac-book-pro15-l2",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "workarena",
+    "n_steps": 24,
+    "n_distinct_pages_pre_se": 7.0,
+    "n_l3_actions": 1,
+    "level_counts": {
+      "L0": 18,
+      "L1": 5,
+      "L3": 1
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "webarena.696::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "webarena.696",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 3.0,
+    "n_l3_actions": 31,
+    "level_counts": {
+      "L3": 31
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.544::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "task_id": "webarena.544",
+    "model": "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 3.0,
+    "n_l3_actions": 31,
+    "level_counts": {
+      "L3": 31
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.700::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "webarena.700",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 17,
+    "n_distinct_pages_pre_se": 3.0,
+    "n_l3_actions": 16,
+    "level_counts": {
+      "L3": 16,
+      "L0": 1
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.789::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "webarena.789",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 3.0,
+    "n_l3_actions": 14,
+    "level_counts": {
+      "L3": 14,
+      "L1": 13,
+      "L0": 4
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.filter-requested-items-and-order-development-laptop-p-c-l2::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "workarena.servicenow.filter-requested-items-and-order-development-laptop-p-c-l2",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "workarena",
+    "n_steps": 16,
+    "n_distinct_pages_pre_se": 6.0,
+    "n_l3_actions": 1,
+    "level_counts": {
+      "L0": 10,
+      "L1": 4,
+      "L3": 1,
+      "L2": 1
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "webarena.289::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "webarena.289",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 3.0,
+    "n_l3_actions": 31,
+    "level_counts": {
+      "L3": 31
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.578::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "webarena.578",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 5.0,
+    "n_l3_actions": 10,
+    "level_counts": {
+      "L1": 14,
+      "L3": 10,
+      "L0": 5,
+      "L2": 2
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.701::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "task_id": "webarena.701",
+    "model": "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 3.0,
+    "n_l3_actions": 27,
+    "level_counts": {
+      "L3": 27,
+      "L0": 4
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.177::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "webarena.177",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 22.0,
+    "n_l3_actions": 21,
+    "level_counts": {
+      "L3": 21,
+      "L0": 8,
+      "L1": 2
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.555::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "webarena.555",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 3.0,
+    "n_l3_actions": 28,
+    "level_counts": {
+      "L3": 28,
+      "L0": 3
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.two-changes-wide-priority-uniform-risk-change-request-scheduling-l2::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "task_id": "workarena.servicenow.two-changes-wide-priority-uniform-risk-change-request-scheduling-l2",
+    "model": "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "n_distinct_pages_pre_se": 8.0,
+    "n_l3_actions": 7,
+    "level_counts": {
+      "L1": 15,
+      "L0": 9,
+      "L3": 7
+    },
+    "heuristic_category": "b_multi_L3"
+  }
+]

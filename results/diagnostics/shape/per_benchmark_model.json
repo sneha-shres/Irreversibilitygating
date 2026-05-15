@@ -2,65 +2,65 @@
   "webarena/GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct": {
     "n_pos": 11,
     "n_neg": 89,
-    "tp": 8,
-    "fp": 32,
-    "recall": 0.7272727272727273,
-    "fpr": 0.3595505617977528
+    "tp": 4,
+    "fp": 10,
+    "recall": 0.36363636363636365,
+    "fpr": 0.11235955056179775
   },
   "webarena/GenericAgent-anthropic_claude-3.7-sonnet": {
     "n_pos": 9,
     "n_neg": 91,
-    "tp": 7,
-    "fp": 32,
-    "recall": 0.7777777777777778,
-    "fpr": 0.3516483516483517
+    "tp": 6,
+    "fp": 11,
+    "recall": 0.6666666666666666,
+    "fpr": 0.12087912087912088
   },
   "webarena/GenericAgent-gpt-4o-2024-11-20": {
     "n_pos": 8,
     "n_neg": 92,
-    "tp": 6,
-    "fp": 35,
-    "recall": 0.75,
-    "fpr": 0.3804347826086957
+    "tp": 4,
+    "fp": 10,
+    "recall": 0.5,
+    "fpr": 0.10869565217391304
   },
   "webarena/GenericAgent-meta-llama_Llama-3.3-70B-Instruct": {
     "n_pos": 4,
     "n_neg": 94,
     "tp": 2,
-    "fp": 37,
+    "fp": 20,
     "recall": 0.5,
-    "fpr": 0.39361702127659576
+    "fpr": 0.2127659574468085
   },
   "workarena/GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct": {
     "n_pos": 3,
     "n_neg": 115,
-    "tp": 0,
-    "fp": 9,
-    "recall": 0.0,
-    "fpr": 0.0782608695652174
+    "tp": 1,
+    "fp": 3,
+    "recall": 0.3333333333333333,
+    "fpr": 0.02608695652173913
   },
   "workarena/GenericAgent-anthropic_claude-3.7-sonnet": {
     "n_pos": 8,
     "n_neg": 110,
-    "tp": 1,
-    "fp": 10,
-    "recall": 0.125,
-    "fpr": 0.09090909090909091
+    "tp": 6,
+    "fp": 11,
+    "recall": 0.75,
+    "fpr": 0.1
   },
   "workarena/GenericAgent-gpt-4o-2024-11-20": {
     "n_pos": 6,
     "n_neg": 112,
-    "tp": 0,
+    "tp": 5,
     "fp": 10,
-    "recall": 0.0,
+    "recall": 0.8333333333333334,
     "fpr": 0.08928571428571429
   },
   "workarena/GenericAgent-meta-llama_Llama-3.3-70B-Instruct": {
     "n_pos": 5,
     "n_neg": 113,
-    "tp": 0,
-    "fp": 3,
-    "recall": 0.0,
-    "fpr": 0.02654867256637168
+    "tp": 3,
+    "fp": 7,
+    "recall": 0.6,
+    "fpr": 0.061946902654867256
   }
 }

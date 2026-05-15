@@ -1,0 +1,452 @@
+[
+  {
+    "trajectory_id": "workarena.servicenow.infeasible-navigate-and-create-incident-with-reason-l2::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "workarena.servicenow.infeasible-navigate-and-create-incident-with-reason-l2",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.038461538461538464,
+    "peak_pi": 0.16666666666666663,
+    "level_counts": {
+      "L1": 27,
+      "L0": 3,
+      "L3": 1
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.infeasible-navigate-and-sort-service-catalog-item-list-with-reason-l2::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "task_id": "workarena.servicenow.infeasible-navigate-and-sort-service-catalog-item-list-with-reason-l2",
+    "model": "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.2,
+    "peak_pi": 0.5769230769230769,
+    "level_counts": {
+      "L0": 26,
+      "L1": 3,
+      "L3": 2
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.on-board-user-l2::GenericAgent-gpt-4o-2024-11-20",
+    "task_id": "workarena.servicenow.on-board-user-l2",
+    "model": "GenericAgent-gpt-4o-2024-11-20",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.4166666666666667,
+    "peak_pi": 0.7,
+    "level_counts": {
+      "L3": 12,
+      "L0": 9,
+      "L1": 9,
+      "L2": 1
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.filter-incident-list::GenericAgent-gpt-4o-2024-11-20",
+    "task_id": "workarena.servicenow.filter-incident-list",
+    "model": "GenericAgent-gpt-4o-2024-11-20",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.14285714285714285,
+    "peak_pi": 0.33333333333333337,
+    "level_counts": {
+      "L1": 29,
+      "L3": 1,
+      "L0": 1
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.create-user::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "task_id": "workarena.servicenow.create-user",
+    "model": "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 13,
+    "peak_d_I": 0.08333333333333333,
+    "peak_pi": 0.08333333333333337,
+    "level_counts": {
+      "L1": 11,
+      "L3": 1,
+      "L0": 1
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.three-changes-fix-wide-schedule-tight-uniform-risk-change-request-scheduling-l2::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "workarena.servicenow.three-changes-fix-wide-schedule-tight-uniform-risk-change-request-scheduling-l2",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.10344827586206896,
+    "peak_pi": 0.25,
+    "level_counts": {
+      "L1": 15,
+      "L0": 10,
+      "L2": 6
+    },
+    "heuristic_category": "c_L2_only"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.infeasible-navigate-and-order-apple-watch-with-reason-l2::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "workarena.servicenow.infeasible-navigate-and-order-apple-watch-with-reason-l2",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.23809523809523808,
+    "peak_pi": 0.45,
+    "level_counts": {
+      "L1": 14,
+      "L0": 12,
+      "L3": 5
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "webarena.185::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "webarena.185",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "webarena",
+    "n_steps": 8,
+    "peak_d_I": 1.0,
+    "peak_pi": 1.0,
+    "level_counts": {
+      "L3": 7,
+      "L0": 1
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.infeasible-navigate-and-create-incident-with-reason-l2::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "workarena.servicenow.infeasible-navigate-and-create-incident-with-reason-l2",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.17647058823529413,
+    "peak_pi": 0.10606060606060608,
+    "level_counts": {
+      "L0": 18,
+      "L1": 8,
+      "L2": 4,
+      "L3": 1
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "webarena.642::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "webarena.642",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "webarena",
+    "n_steps": 9,
+    "peak_d_I": 0.42857142857142855,
+    "peak_pi": 0.6,
+    "level_counts": {
+      "L0": 4,
+      "L3": 3,
+      "L1": 2
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.navigate-and-filter-change-request-list-l2::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "workarena.servicenow.navigate-and-filter-change-request-list-l2",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.1111111111111111,
+    "peak_pi": 0.5588235294117647,
+    "level_counts": {
+      "L1": 25,
+      "L0": 4,
+      "L2": 2
+    },
+    "heuristic_category": "c_L2_only"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.two-changes-fix-wide-basic-varied-risk-change-request-scheduling-l2::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "workarena.servicenow.two-changes-fix-wide-basic-varied-risk-change-request-scheduling-l2",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.09090909090909091,
+    "peak_pi": 0.3125,
+    "level_counts": {
+      "L1": 16,
+      "L0": 11,
+      "L2": 4
+    },
+    "heuristic_category": "c_L2_only"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.infeasible-navigate-and-order-development-laptop-p-c-l2::GenericAgent-gpt-4o-2024-11-20",
+    "task_id": "workarena.servicenow.infeasible-navigate-and-order-development-laptop-p-c-l2",
+    "model": "GenericAgent-gpt-4o-2024-11-20",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.19230769230769232,
+    "peak_pi": 0.375,
+    "level_counts": {
+      "L1": 17,
+      "L0": 9,
+      "L3": 5
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.dashboard-retrieve-incident-and-min-create-problem-l2::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "task_id": "workarena.servicenow.dashboard-retrieve-incident-and-min-create-problem-l2",
+    "model": "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.13636363636363635,
+    "peak_pi": 0.375,
+    "level_counts": {
+      "L1": 18,
+      "L0": 10,
+      "L3": 2,
+      "L2": 1
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.create-problem::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "task_id": "workarena.servicenow.create-problem",
+    "model": "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 5,
+    "peak_d_I": 0.25,
+    "peak_pi": 0.25,
+    "level_counts": {
+      "L1": 3,
+      "L3": 1,
+      "L0": 1
+    },
+    "heuristic_category": "a_short_single_L3"
+  },
+  {
+    "trajectory_id": "webarena.629::GenericAgent-gpt-4o-2024-11-20",
+    "task_id": "webarena.629",
+    "model": "GenericAgent-gpt-4o-2024-11-20",
+    "benchmark": "webarena",
+    "n_steps": 8,
+    "peak_d_I": 1.0,
+    "peak_pi": 1.0,
+    "level_counts": {
+      "L1": 4,
+      "L3": 2,
+      "L0": 2
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.infeasible-navigate-and-sort-hardware-list-l2::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "workarena.servicenow.infeasible-navigate-and-sort-hardware-list-l2",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.07692307692307693,
+    "peak_pi": 0.2,
+    "level_counts": {
+      "L0": 22,
+      "L1": 7,
+      "L3": 2
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "webarena.491::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "webarena.491",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "webarena",
+    "n_steps": 6,
+    "peak_d_I": 1.0,
+    "peak_pi": 1.0,
+    "level_counts": {
+      "L3": 5,
+      "L0": 1
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.filter-incident-list::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "task_id": "workarena.servicenow.filter-incident-list",
+    "model": "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.0625,
+    "peak_pi": 0.6666666666666667,
+    "level_counts": {
+      "L1": 28,
+      "L0": 2,
+      "L3": 1
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "webarena.518::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "webarena.518",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 2,
+    "peak_d_I": 0.5,
+    "peak_pi": 1.0,
+    "level_counts": {
+      "L2": 1,
+      "L0": 1
+    },
+    "heuristic_category": "c_L2_only"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.dashboard-retrieve-catalog-and-max-order-standard-laptop-l2::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "task_id": "workarena.servicenow.dashboard-retrieve-catalog-and-max-order-standard-laptop-l2",
+    "model": "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.15,
+    "peak_pi": 0.09999999999999998,
+    "level_counts": {
+      "L0": 18,
+      "L2": 9,
+      "L1": 4
+    },
+    "heuristic_category": "c_L2_only"
+  },
+  {
+    "trajectory_id": "webarena.272::GenericAgent-gpt-4o-2024-11-20",
+    "task_id": "webarena.272",
+    "model": "GenericAgent-gpt-4o-2024-11-20",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "peak_d_I": 0.07407407407407407,
+    "peak_pi": 0.33333333333333337,
+    "level_counts": {
+      "L0": 21,
+      "L1": 8,
+      "L3": 2
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.off-board-user-l2::GenericAgent-gpt-4o-2024-11-20",
+    "task_id": "workarena.servicenow.off-board-user-l2",
+    "model": "GenericAgent-gpt-4o-2024-11-20",
+    "benchmark": "workarena",
+    "n_steps": 22,
+    "peak_d_I": 0.03571428571428571,
+    "peak_pi": 0.3076923076923077,
+    "level_counts": {
+      "L1": 17,
+      "L0": 4,
+      "L2": 1
+    },
+    "heuristic_category": "c_L2_only"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.two-changes-wide-priority-uniform-risk-change-request-scheduling-l2::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "task_id": "workarena.servicenow.two-changes-wide-priority-uniform-risk-change-request-scheduling-l2",
+    "model": "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.30434782608695654,
+    "peak_pi": 0.2571428571428571,
+    "level_counts": {
+      "L1": 15,
+      "L0": 9,
+      "L3": 7
+    },
+    "heuristic_category": "b_multi_L3"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.navigate-and-order-apple-mac-book-pro15-l2::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "workarena.servicenow.navigate-and-order-apple-mac-book-pro15-l2",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 8,
+    "peak_d_I": 0.14285714285714285,
+    "peak_pi": 0.1428571428571429,
+    "level_counts": {
+      "L0": 5,
+      "L1": 2,
+      "L3": 1
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "webarena.623::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "task_id": "webarena.623",
+    "model": "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 9,
+    "peak_d_I": 0.25,
+    "peak_pi": 0.5,
+    "level_counts": {
+      "L1": 4,
+      "L0": 3,
+      "L3": 2
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.navigate-and-order-apple-watch-l2::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "workarena.servicenow.navigate-and-order-apple-watch-l2",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "workarena",
+    "n_steps": 9,
+    "peak_d_I": 0.125,
+    "peak_pi": 0.125,
+    "level_counts": {
+      "L0": 5,
+      "L1": 3,
+      "L3": 1
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "workarena.servicenow.date-based-expense-management-large-l2::GenericAgent-anthropic_claude-3.7-sonnet",
+    "task_id": "workarena.servicenow.date-based-expense-management-large-l2",
+    "model": "GenericAgent-anthropic_claude-3.7-sonnet",
+    "benchmark": "workarena",
+    "n_steps": 31,
+    "peak_d_I": 0.10526315789473684,
+    "peak_pi": 0.2666666666666667,
+    "level_counts": {
+      "L0": 22,
+      "L1": 7,
+      "L3": 2
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "webarena.642::GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "task_id": "webarena.642",
+    "model": "GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 12,
+    "peak_d_I": 0.2,
+    "peak_pi": 0.5,
+    "level_counts": {
+      "L1": 6,
+      "L0": 4,
+      "L3": 2
+    },
+    "heuristic_category": "d_other"
+  },
+  {
+    "trajectory_id": "webarena.629::GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "task_id": "webarena.629",
+    "model": "GenericAgent-meta-llama_Llama-3.3-70B-Instruct",
+    "benchmark": "webarena",
+    "n_steps": 31,
+    "peak_d_I": 1.0,
+    "peak_pi": 1.0,
+    "level_counts": {
+      "L3": 17,
+      "L1": 13,
+      "L0": 1
+    },
+    "heuristic_category": "b_multi_L3"
+  }
+]

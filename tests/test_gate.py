@@ -108,6 +108,8 @@ def test_pure_read_only_trajectory_approves_all_steps():
 
 
 def test_multi_L3_trajectory_blocks():
+    # Delete → L3 (safety-first default); Submit on plain URL → L2 (URL-guarded rule).
+    # Combined trajectory [L3, L2]: d_I = (1.0 + 0.5) / 2 = 0.75, still exceeds tau_d=0.15.
     trajectory = make_trajectory([
         make_step("click('100')", "[100] role='button' name='Delete'"),
         make_step("click('200')", "[200] role='button' name='Submit'"),
@@ -116,7 +118,7 @@ def test_multi_L3_trajectory_blocks():
     second = gate_step(trajectory, 1, config)
     assert second.decision == "block"
     assert second.profile.f == 1
-    assert second.profile.d_I == 1.0
+    assert abs(second.profile.d_I - 0.75) < 1e-8
 
 
 def test_single_L3_in_many_steps_blocks_with_tight_tau():

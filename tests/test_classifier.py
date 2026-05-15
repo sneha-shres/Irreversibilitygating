@@ -27,9 +27,19 @@ def test_stage1_send_msg_is_L0():
     assert classify_stage1(action) == Level.L0
 
 
-def test_stage1_submit_element_is_L3():
+def test_stage1_submit_element_is_L2_on_plain_url():
+    # "Submit" on a non-commerce/admin URL → L2 (URL-guarded publish rule)
     action = Action.from_step(
         make_step("click('1976')", "[1976] role='button' name='Submit'"),
+        0,
+    )
+    assert classify_stage1(action) == Level.L2
+
+
+def test_stage1_submit_element_is_L3_on_checkout_url():
+    # "Submit" on a checkout URL → L3 (commerce/admin URL escalates publish text)
+    action = Action.from_step(
+        make_step("click('1976')", "[1976] role='button' name='Submit'", "https://shop.com/checkout/review"),
         0,
     )
     assert classify_stage1(action) == Level.L3
