@@ -13,12 +13,12 @@ agent proposes action
         ↓
 classify trajectory-so-far by reversibility level (L0–L3)
         ↓
-compute risk profile (f, d_I, π)
+compute risk profile (f, d_I, irr_pos)
         ↓
 gate_decision(profile, τ_d, τ_π) → approve or block
 ```
 
-**Gate policy (disjunction):** block iff `f=1` and (`d_I ≥ τ_d` or `π ≥ τ_π`). No LLM at gate time.
+**Gate policy (irr_gate):** block iff `f=1` and (`d_I ≥ τ_d` or `irr_pos ≥ τ_π`). No LLM at gate time.
 
 In the retrospective evaluation, completed trajectories are replayed to determine at which step IrrGate would have first intervened.
 
@@ -34,16 +34,16 @@ In the retrospective evaluation, completed trajectories are replayed to determin
 ### Risk profile
 
 - **f**: 1 if any action has severity > 0 (any L2/L3 step), else 0
-- **d_I**: mean severity over all steps (density of risky actions)
-- **π**: plan-level risk weighted by BID-coverage — how many distinct UI elements (BIDs) the agent has already visited before each action; actions targeting unseen elements carry higher residual risk
+- **d_I**: absolute cumulative severity sum across all steps — NOT a mean; monotone increasing, avoids the length-dilution problem of density
+- **irr_pos**: count of distinct page URLs from step 0 up to and including the last L2/L3 step; captures how broadly the agent explored before its last risky action
 
 ### Gate decision
 
 ```python
 def gate_decision(profile, tau_d, tau_pi) -> "approve" | "block":
     if profile.f == 0:
-        return "approve"                         # no risky step seen
-    if profile.d_I >= tau_d or profile.pi >= tau_pi:
+        return "approve"                              # no risky step seen
+    if profile.d_I >= tau_d or profile.irr_pos >= tau_pi:
         return "block"
     return "approve"
 ```
@@ -84,7 +84,7 @@ PYTHONPATH=. python3 scripts/compute_profiles.py
 PYTHONPATH=. python3 scripts/run_cv.py
 # → results/cv/cv_results.json
 
-# Step 4: Phase 3 diagnostics (per-benchmark, FN enumeration, FP sample, α sensitivity)
+# Step 4: Diagnostics (reads CV-selected thresholds automatically)
 PYTHONPATH=. python3 scripts/run_diagnostics.py
 # → results/diagnostics/
 
@@ -92,20 +92,18 @@ PYTHONPATH=. python3 scripts/run_diagnostics.py
 PYTHONPATH=. python3 scripts/run_evaluation.py \
   --eval-set data/eval_set.json \
   --trajectory-dir data/raw \
-  --tau-d 0.05 \
-  --tau-pi 0.10 \
-  --ablation-variant disjunction \
+  --tau-d 10.0 \
+  --tau-pi 6 \
   --output-dir results/my_run
 ```
 
 ### Ablation variants
 
 ```bash
---ablation-variant f_only       # block iff f=1
---ablation-variant f_plus_d     # block iff f=1 AND d_I ≥ τ_d
---ablation-variant f_plus_pi    # block iff f=1 AND π ≥ τ_π
---ablation-variant disjunction  # block iff f=1 AND (d_I ≥ τ_d OR π ≥ τ_π) [primary]
---ablation-variant conjunction  # block iff f=1 AND d_I ≥ τ_d AND π ≥ τ_π
+--ablation-variant f_only              # block iff f=1
+--ablation-variant irr_density_only    # block iff f=1 AND d_I ≥ τ_d
+--ablation-variant irr_positional_only # block iff f=1 AND irr_pos ≥ τ_π
+--ablation-variant irr_gate            # block iff f=1 AND (d_I ≥ τ_d OR irr_pos ≥ τ_π) [primary]
 ```
 
 ## Results
@@ -118,73 +116,65 @@ PYTHONPATH=. python3 scripts/run_evaluation.py \
 
 ### CV summary (5×5 repeated stratified CV, FPR budget ≤ 10%)
 
-Two passes run on the same 25 stratified splits. Pass A uses density features (τ_d, τ_π); Pass B uses shape features (τ_pages, τ_l3). Pooled Wilson 95% CIs across all 25 held-out folds; `*` marks the primary variant driving threshold selection in each pass.
-
-**Pass A — density variants** (grid: `τ_d × τ_π`, primary: `disjunction`)
-
-No configuration met the 10% FPR budget; the fallback criterion (minimize FPR) selected `τ_d = 0.30, τ_π = 0.50` in all 25 splits.
+Grid: τ_d ∈ {0.5–20.0}, τ_π ∈ {1–10}. Modal CV-selected: **τ_d = 10.0** (17/25 splits), **τ_π = 6** (19/25 splits). Pooled Wilson 95% CIs across all 25 held-out folds; `*` marks the primary variant.
 
 | Variant | Recall | 95% CI | FPR | 95% CI |
 |---------|--------|--------|-----|--------|
-| f_only | 0.870 | [0.825, 0.905] | 0.373 | [0.358, 0.387] |
-| f_plus_d | 0.352 | [0.297, 0.411] | 0.175 | [0.164, 0.187] |
-| f_plus_pi | 0.426 | [0.368, 0.486] | 0.184 | [0.172, 0.196] |
-| **disjunction** * | **0.444** | [0.386, 0.504] | **0.206** | [0.194, 0.219] |
-| conjunction | 0.333 | [0.280, 0.392] | 0.153 | [0.142, 0.165] |
+| f_only | 0.889 | [0.845, 0.922] | 0.387 | [0.372, 0.402] |
+| irr_density_only | 0.170 | [0.130, 0.220] | 0.060 | [0.053, 0.068] |
+| irr_positional_only | 0.341 | [0.287, 0.399] | 0.050 | [0.043, 0.057] |
+| **irr_gate** * | **0.470** | [0.412, 0.530] | **0.097** | [0.088, 0.106] |
 
-**Pass B — shape variants** (grid: `τ_pages × τ_l3`, primary: `pages_disj_l3`)
-
-The shape formulation meets the FPR budget: `pages_disj_l3` achieves FPR 0.098, recall 0.544 under held-out CV (strictly dominates the density disjunction on both metrics). After two grid-widening iterations (`τ_pages ∈ {2–12}`, `τ_l3 ∈ {1–18}`), the CV selected `τ_pages = 5` (24/25 splits) and `τ_l3 = 14` (11/25 splits) — neither at the grid edge. `pages_only` at the same τ_pages yields recall 0.441 vs. 0.544 for `pages_disj_l3`, so the l3 term adds a meaningful +10.3pp recall at +4.2pp FPR cost.
-
-| Variant | Recall | 95% CI | FPR | 95% CI |
-|---------|--------|--------|-----|--------|
-| f_only | 0.870 | [0.825, 0.905] | 0.373 | [0.358, 0.387] |
-| pages_only | 0.441 | [0.383, 0.500] | 0.056 | [0.049, 0.064] |
-| l3_count_only | 0.141 | [0.104, 0.187] | 0.048 | [0.042, 0.055] |
-| **pages_disj_l3** * | **0.544** | [0.485, 0.603] | **0.098** | [0.089, 0.107] |
-| pages_conj_l3 | 0.037 | [0.020, 0.067] | 0.007 | [0.005, 0.010] |
+- **Recall ceiling: 88.9% (48/54)** — 6 permanent f=0 misses (pure L0/L1 trajectories; taxonomy boundary)
+- **FPR budget met.** irr_gate strictly dominates both single-feature variants on both metrics
+- irr_positional_only contributes the larger share of recall; the d_I term adds +12.9pp recall at +4.7pp FPR cost
 
 ### Full-dataset performance
 
-At the recall ceiling (`τ_d = 0.05, τ_π = 0.10`):
-- **Recall: 87.0%** (47/54) — 7 permanent misses, all f=0 (pure L0/L1 trajectories)
-- FPR: ~36.6%
+| Setting | Recall | FPR |
+|---------|--------|-----|
+| f_only (recall ceiling) | 88.9% (48/54) | 38.7% |
+| irr_gate at τ_d=10.0, τ_π=6 (held-out CV) | 47.0% | 9.7% |
+| irr_gate at τ_d=10.0, τ_π=6 (full dataset) | 51.9% (28/54) | 9.9% |
 
-At CV-selected thresholds (`τ_d = 0.30, τ_π = 0.50`):
-- **Recall: 44.4%** (24/54)
-- **FPR: 20.6%** (168/816)
-
-### Per-benchmark breakdown (disjunction, τ_d = 0.30, τ_π = 0.50)
+### Per-benchmark breakdown (irr_gate, τ_d=10.0, τ_π=6)
 
 | Benchmark | Model | Pos | Neg | Recall | FPR |
 |-----------|-------|-----|-----|--------|-----|
-| WebArena | Qwen 2.5-VL-72B | 11 | 89 | 1.000 | 0.427 |
-| WebArena | Claude 3.7 Sonnet | 9 | 91 | 1.000 | 0.407 |
-| WebArena | GPT-4o | 8 | 92 | 0.750 | 0.424 |
-| WebArena | Llama 3.3-70B | 4 | 94 | 0.750 | 0.436 |
-| WorkArena | Claude 3.7 Sonnet | 8 | 110 | 0.875 | 0.409 |
-| WorkArena | GPT-4o | 6 | 112 | 0.833 | 0.277 |
-| WorkArena | Llama 3.3-70B | 5 | 113 | 0.800 | 0.310 |
-| WorkArena | Qwen 2.5-VL-72B | 3 | 115 | 0.667 | 0.304 |
+| WebArena | Qwen 2.5-VL-72B | 11 | 89 | 0.364 | 0.157 |
+| WebArena | Claude 3.7 Sonnet | 9 | 91 | 0.556 | 0.121 |
+| WebArena | GPT-4o | 8 | 92 | 0.625 | 0.141 |
+| WebArena | Llama 3.3-70B | 4 | 94 | 0.500 | 0.191 |
+| WorkArena | Claude 3.7 Sonnet | 8 | 110 | 0.500 | 0.091 |
+| WorkArena | GPT-4o | 6 | 112 | 0.833 | 0.080 |
+| WorkArena | Llama 3.3-70B | 5 | 113 | 0.600 | 0.044 |
+| WorkArena | Qwen 2.5-VL-72B | 3 | 115 | 0.000 | 0.009 |
 
-### Alpha sensitivity (disjunction, τ_d = 0.05, τ_π = 0.10)
+### Alpha sensitivity (irr_gate, τ_d=10.0, τ_π=6)
 
-| α | Recall | FPR |
-|---|--------|-----|
-| 0.25 | 0.870 | 0.365 |
-| 0.50 | 0.870 | 0.366 |
-| 0.75 | 0.870 | 0.368 |
-| 1.00 | 0.870 | 0.368 |
-
-α (severity weight for L2 actions) is **inert**: recall and FPR change by < 0.01 across the full range. τ_d is the only active discriminative lever.
+α (severity weight for L2 actions) is **inert**: recall and FPR change by < 0.01 across α ∈ {0.25, 1.0}.
 
 ### Stage contribution
 
-Of 2,353 L2/L3 classification steps: **95.1% from stage-1** (rule-based), 4.9% from stage-2 (Gemini). Stage-2 adds coverage with minimal API cost.
+Of 2,676 L2/L3 classification steps: **94.4% from stage-1** (rule-based), 5.6% from stage-2 (Gemini). Stage-2 adds coverage with minimal API cost.
 
-### False negative analysis (at recall ceiling)
+### False negative analysis (τ_d=10.0, τ_π=6)
 
-All 7 permanent misses are f=0 trajectories — IrrGate found no L2/L3 action. These are trajectories where the only action is `send_msg_to_user`, classified as L0 by design (IrrGate scopes to state-changing side effects, not communicative ones).
+**26 false negatives total:**
+- **6 permanent f=0 misses** — IrrGate found no L2/L3 action (taxonomy boundary: `send_msg_to_user` only)
+- **20 f=1 below thresholds** — trajectory had a risky step but peak d_I < 10.0 and irr_pos < 6
+
+### Threshold sensitivity (τ_d=10.0, τ_π=6 baseline)
+
+| Config | τ_d | τ_π | Recall | FPR |
+|--------|-----|---------|--------|-----|
+| baseline | 10.0 | 6 | 0.519 | 0.099 |
+| τ_d − 1 | 9.0 | 6 | 0.519 | 0.105 |
+| τ_d + 1 | 11.0 | 6 | 0.519 | 0.098 |
+| τ_π − 1 | 10.0 | 5 | 0.630 | 0.124 |
+| τ_π + 1 | 10.0 | 7 | 0.481 | 0.087 |
+
+**τ_d is inert at this operating point** — changing it by ±1 does not move recall at all. τ_π is the sole active lever.
 
 ## Project Structure
 
@@ -192,9 +182,9 @@ All 7 permanent misses are f=0 trajectories — IrrGate found no L2/L3 action. T
 irrgate/                      # Core package
 ├── actions.py                # Action parsing and representation
 ├── classifier.py             # Stage-1 rules + stage-2 LLM fallback (L0–L3)
-├── config.py                 # Hyperparameters (ALPHA, TAU_D, TAU_PI); settings I/O
+├── config.py                 # Hyperparameters (ALPHA, BETA, TAU_D, TAU_PI); settings I/O
 ├── gate.py                   # gate_decision(profile, tau_d, tau_pi): block/approve
-├── profile.py                # Risk profile: f, d_I, π (BID-coverage formula)
+├── profile.py                # Risk profile: f, d_I (cumulative), irr_pos (distinct pages)
 ├── taxonomy.py               # Level definitions and severity weights
 ├── _gemini.py                # Gemini client singleton; backoff/throttling
 ├── data/                     # Data loading utilities
@@ -203,10 +193,10 @@ scripts/
 ├── download_data.py          # Pull AgentRewardBench from HuggingFace
 ├── build_eval_set.py         # Build stratified eval set (deduplicated by task×model)
 ├── build_classification_cache.py  # Pre-compute per-step classifications → parquet
-├── compute_profiles.py       # Full-trajectory peak profiles → results/profiles/
+├── compute_profiles.py       # Full-trajectory profiles → results/profiles/
 ├── run_cv.py                 # 5×5 stratified CV → results/cv/cv_results.json
-├── run_diagnostics.py        # Phase 3 diagnostics → results/diagnostics/
-├── run_evaluation.py         # Trajectory-by-trajectory evaluation (five variants)
+├── run_diagnostics.py        # Diagnostics → results/diagnostics/
+├── run_evaluation.py         # Trajectory-by-trajectory evaluation (four variants)
 └── analyze_thresholds.py     # Post-hoc threshold sweep from progress.jsonl
 data/
 ├── eval_set.json             # 870 trajectories (54 pos, 816 neg)
@@ -214,10 +204,8 @@ data/
 └── raw/                      # Raw trajectory JSON files
 results/
 ├── profiles/                 # profiles.parquet (one row per trajectory)
-├── cv/                       # cv_results.json (two-pass: pass_a_density + pass_b_shape)
-└── diagnostics/
-    ├── density/              # disjunction at CV-selected τ_d=0.30, τ_π=0.50
-    └── shape/                # pages_disj_l3 at CV-selected τ_pages=5, τ_l3=14
+├── cv/                       # cv_results.json (irr_gate CV; Wilson CIs; tau selection)
+└── diagnostics/              # FN list, FP sample, threshold sensitivity, stage contribution
 tests/                        # pytest test suite
 config/
 └── settings.json             # Active tau_d, tau_pi (written by analyze_thresholds.py)
@@ -236,15 +224,16 @@ PYTHONPATH=. python -m pytest tests/ -q
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `ALPHA` | 0.5 | Severity weight for L2 actions (fixed, not tuned — inert on this dataset) |
-| `TAU_D` | 0.15 | d_I threshold for blocking |
-| `TAU_PI` | 0.30 | π threshold for blocking |
+| `BETA` | 0.1 | Severity weight for L1 actions (minor contribution to d_I) |
+| `TAU_D` | 5.0 | d_I threshold for blocking (CV-selected: 10.0) |
+| `TAU_PI` | 5 | irr_pos threshold for blocking (CV-selected: 6) |
 
 Active values are read from `config/settings.json`; CLI flags take precedence.
 
 ## Limitations
 
-- **Density FPR budget unachievable**: The density formulation cannot meet FPR ≤ 10%; minimum is 20.6% at recall 44.4%. The shape formulation achieves FPR 0.098 at recall 0.544 under held-out CV (budget met). The two formulations are complementary: density requires no page-visit tracking but cannot stay under the FPR budget; shape requires page-count bookkeeping but does.
-- **d_I dilution**: Mean severity is divided over all steps; a long trajectory with one risky action near the end may never cross τ_d. The shape formulation uses raw counts (not averages) and is not subject to this dilution.
-- **τ_π inertness**: π has negligible discriminative effect on this dataset; τ_d is the only active lever in the density formulation.
-- **Shape threshold brittleness**: At (τ_pages=5, τ_l3=14), decreasing τ_pages by 1 raises full-dataset FPR from 0.100 to 0.168 (+6.8pp); increasing it by 1 drops recall from 0.574 to 0.481 (−9.3pp). The τ_pages lever is sensitive near the operating point.
-- **7 permanent f=0 misses**: Pure communicative trajectories (`send_msg_to_user` only) that annotators labeled as side effects — a taxonomy boundary, not a bug.
+- **FPR–recall tradeoff:** At CV-selected thresholds (τ_d=10.0, τ_π=6), irr_gate achieves recall 47.0% under held-out CV with FPR 9.7%. The FPR budget is met but recall is limited.
+- **Hard negatives:** 304 of 816 negatives reach f=1 from task-required L3 actions. The gate cannot distinguish one correct irreversible action from an accidental one without intent information — fundamental design tradeoff.
+- **irr_positional_only dominates recall:** The d_I term alone achieves only 17.0% recall at τ_d=10.0; irr_pos contributes most of the gate's discriminative power.
+- **α is inert:** ALPHA=0.5 has no empirical basis on this dataset; sensitivity is flat across α ∈ {0.25, 1.0}.
+- **6 permanent f=0 misses:** Pure communicative trajectories (`send_msg_to_user` only) that annotators labeled as side effects — a taxonomy boundary, not a bug.

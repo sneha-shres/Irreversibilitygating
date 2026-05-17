@@ -46,48 +46,39 @@ def make_trajectory(steps: list[dict[str, str]], side_effect_label: str = "No") 
 # ── gate_decision unit tests ────────────────────────────────────────────────
 
 def test_gate_decision_approves_when_f_zero():
-    profile = RiskProfile(f=0, d_I=0.0, pi=0.0)
-    assert gate_decision(profile, tau_d=0.15, tau_pi=0.30) == "approve"
+    profile = RiskProfile(f=0, d_I=0.0, irr_pos=0)
+    assert gate_decision(profile, tau_d=0.15, tau_pi=5) == "approve"
 
 
 def test_gate_decision_approves_when_both_below_thresholds():
-    profile = RiskProfile(f=1, d_I=0.1, pi=0.2)
-    assert gate_decision(profile, tau_d=0.15, tau_pi=0.30) == "approve"
+    profile = RiskProfile(f=1, d_I=3.0, irr_pos=2)
+    assert gate_decision(profile, tau_d=5.0, tau_pi=5) == "approve"
 
 
 def test_gate_decision_blocks_when_d_I_meets_threshold():
-    profile = RiskProfile(f=1, d_I=0.15, pi=0.0)
-    assert gate_decision(profile, tau_d=0.15, tau_pi=0.30) == "block"
+    profile = RiskProfile(f=1, d_I=5.0, irr_pos=0)
+    assert gate_decision(profile, tau_d=5.0, tau_pi=5) == "block"
 
 
-def test_gate_decision_blocks_when_pi_meets_threshold():
-    profile = RiskProfile(f=1, d_I=0.0, pi=0.30)
-    assert gate_decision(profile, tau_d=0.15, tau_pi=0.30) == "block"
+def test_gate_decision_blocks_when_irr_pos_meets_threshold():
+    profile = RiskProfile(f=1, d_I=0.0, irr_pos=5)
+    assert gate_decision(profile, tau_d=5.0, tau_pi=5) == "block"
 
 
 def test_gate_decision_blocks_when_both_exceed_thresholds():
-    profile = RiskProfile(f=1, d_I=0.5, pi=0.5)
-    assert gate_decision(profile, tau_d=0.15, tau_pi=0.30) == "block"
-
-
-def test_gate_decision_conjunction_requires_both():
-    profile_d_only = RiskProfile(f=1, d_I=0.5, pi=0.1)
-    profile_pi_only = RiskProfile(f=1, d_I=0.1, pi=0.5)
-    profile_both = RiskProfile(f=1, d_I=0.5, pi=0.5)
-    assert gate_decision(profile_d_only, tau_d=0.15, tau_pi=0.30, use_conjunction=True) == "approve"
-    assert gate_decision(profile_pi_only, tau_d=0.15, tau_pi=0.30, use_conjunction=True) == "approve"
-    assert gate_decision(profile_both, tau_d=0.15, tau_pi=0.30, use_conjunction=True) == "block"
+    profile = RiskProfile(f=1, d_I=10.0, irr_pos=10)
+    assert gate_decision(profile, tau_d=5.0, tau_pi=5) == "block"
 
 
 def test_gate_decision_f_zero_always_approves_regardless_of_thresholds():
-    profile = RiskProfile(f=0, d_I=0.99, pi=0.99)
-    assert gate_decision(profile, tau_d=0.0, tau_pi=0.0) == "approve"
+    profile = RiskProfile(f=0, d_I=100.0, irr_pos=100)
+    assert gate_decision(profile, tau_d=0.0, tau_pi=0) == "approve"
 
 
 # ── GateDecision dataclass ───────────────────────────────────────────────────
 
 def test_gate_decision_has_no_regime_or_rubric_fields():
-    d = GateDecision(step_index=0, decision="approve", profile=RiskProfile(f=0, d_I=0.0, pi=0.0))
+    d = GateDecision(step_index=0, decision="approve", profile=RiskProfile(f=0, d_I=0.0, irr_pos=0))  # noqa
     assert not hasattr(d, "regime")
     assert not hasattr(d, "rubric_verdicts")
     assert not hasattr(d, "blocking_reason")
@@ -109,16 +100,16 @@ def test_pure_read_only_trajectory_approves_all_steps():
 
 def test_multi_L3_trajectory_blocks():
     # Delete → L3 (safety-first default); Submit on plain URL → L2 (URL-guarded rule).
-    # Combined trajectory [L3, L2]: d_I = (1.0 + 0.5) / 2 = 0.75, still exceeds tau_d=0.15.
+    # Combined trajectory [L3, L2]: absolute d_I = 1.0 + 0.5 = 1.5 → exceeds tau_d=1.0.
     trajectory = make_trajectory([
         make_step("click('100')", "[100] role='button' name='Delete'"),
         make_step("click('200')", "[200] role='button' name='Submit'"),
     ])
-    config = Config()
+    config = Config(tau_d=1.0, tau_pi=10)
     second = gate_step(trajectory, 1, config)
     assert second.decision == "block"
     assert second.profile.f == 1
-    assert abs(second.profile.d_I - 0.75) < 1e-8
+    assert abs(second.profile.d_I - 1.5) < 1e-8   # absolute sum: 1.0 (L3) + 0.5 (L2)
 
 
 def test_single_L3_in_many_steps_blocks_with_tight_tau():
@@ -130,7 +121,7 @@ def test_single_L3_in_many_steps_blocks_with_tight_tau():
         make_step("noop()"),
         make_step("click('200')", "[200] role='button' name='Submit'"),
     ])
-    config = Config(tau_d=0.02, tau_pi=0.02)
+    config = Config(tau_d=0.05, tau_pi=1)  # very tight — any L2/L3 triggers d_I >= 0.5
     decision = gate_step(trajectory, 5, config)
     assert decision.decision == "block"
 
@@ -140,7 +131,7 @@ def test_gate_approves_all_when_thresholds_disabled():
         make_step("click('100')", "[100] role='button' name='Delete'"),
         make_step("click('200')", "[200] role='button' name='Submit'"),
     ])
-    config = Config(tau_d=99.0, tau_pi=99.0)
+    config = Config(tau_d=99.0, tau_pi=99)
     for idx in range(len(trajectory.steps)):
         decision = gate_step(trajectory, idx, config)
         assert decision.decision == "approve"

@@ -49,11 +49,11 @@ def test_evaluate_trajectory_identifies_first_blocking_step():
         make_step("fill('100', 'text')", "[100] role='textbox' name='Input'"),
         make_step("click('200')", "[200] role='button' name='Submit'"),
     ])
-    config = Config()
+    # tau_d=0.4: a single L2 Submit gives absolute d_I=0.5 >= 0.4 → blocked
+    config = Config(tau_d=0.4, tau_pi=10)
 
     result = evaluate_trajectory(trajectory, config)
 
-    # The submit click should be blocked due to missing consent
     assert result.first_blocking_step == 2
     assert not result.reached_completion
 

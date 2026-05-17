@@ -19,22 +19,13 @@ class GateDecision:
 def gate_decision(
     profile: RiskProfile,
     tau_d: float,
-    tau_pi: float,
-    use_conjunction: bool = False,
+    tau_pi: int,
 ) -> Literal["approve", "block"]:
-    """Block iff f=1 and threshold condition is met.
-
-    Disjunction (default, primary policy): d_I >= tau_d OR pi >= tau_pi
-    Conjunction: d_I >= tau_d AND pi >= tau_pi
-    """
+    """Block iff f=1 and d_I >= tau_d OR irr_pos >= tau_pi."""
     if profile.f == 0:
         return "approve"
-    if use_conjunction:
-        if profile.d_I >= tau_d and profile.pi >= tau_pi:
-            return "block"
-    else:
-        if profile.d_I >= tau_d or profile.pi >= tau_pi:
-            return "block"
+    if profile.d_I >= tau_d or profile.irr_pos >= tau_pi:
+        return "block"
     return "approve"
 
 
@@ -45,12 +36,5 @@ def make_gate_decision(
 ) -> GateDecision:
     step_index = len(actions) - 1
     profile = compute_risk_profile(levels, actions)
-    decision = gate_decision(
-        profile,
-        tau_d=config.tau_d,
-        tau_pi=config.tau_pi,
-        use_conjunction=config.use_conjunction,
-    )
+    decision = gate_decision(profile, tau_d=config.tau_d, tau_pi=config.tau_pi)
     return GateDecision(step_index=step_index, decision=decision, profile=profile)
-
-

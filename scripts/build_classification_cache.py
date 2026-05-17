@@ -130,15 +130,12 @@ def build(
         t0 = time.time()
         traj_actions: list[Action] = []
         traj_levels: list[Level] = []
-        traj_axtrees: list[str] = []
         for step_index, step in enumerate(traj.steps):
             action = Action.from_step(step, step_index=step_index)
             result = classify_with_details(action)
-            axtree = str(step.get("axtree", ""))
             traj_actions.append(action)
             traj_levels.append(result.final_level)
-            traj_axtrees.append(axtree)
-            profile = compute_risk_profile(traj_levels, traj_actions, traj_axtrees)
+            profile = compute_risk_profile(traj_levels, traj_actions)
             buffer.append({
                 "trajectory_id": traj_id,
                 "step_index": step_index,

@@ -1,8 +1,8 @@
 {
-  "total_L2L3_steps": 2353,
-  "stage1_count": 2238,
-  "stage1_pct": 0.9511262218444538,
-  "stage2_count": 115,
-  "stage2_pct": 0.04887377815554611,
+  "total_L2L3_steps": 2676,
+  "stage1_count": 2525,
+  "stage1_pct": 0.9435724962630793,
+  "stage2_count": 151,
+  "stage2_pct": 0.05642750373692078,
   "other_count": 0
 }

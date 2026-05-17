@@ -1,138 +1,58 @@
-"""Phase 3 diagnostics for IrrGate — two passes (density and shape).
+"""IrrGate diagnostics.
 
 Reads:  results/profiles/profiles.parquet
         data/classification_cache.parquet
         results/cv/cv_results.json  (for selected thresholds)
-Writes:
-  results/diagnostics/density/   — density-variant (disjunction) diagnostics
-  results/diagnostics/shape/     — shape-variant (pages_disj_l3) diagnostics
-
-Per-pass outputs (both passes):
+Writes: results/diagnostics/
   per_benchmark_model.json   — recall/FPR per (benchmark, model) cell
   false_negatives.json       — every missed positive with gate-decision features
   fp_sample.json             — 30 blocked negatives (random_state=42) with categories
-  stage_contribution.json    — % L2/L3 from stage-1 vs stage-2
-
-Density-only:
-  alpha_sensitivity.json     — disjunction recall/FPR at α ∈ {0.25, 0.5, 0.75, 1.0}
-
-Shape-only:
   threshold_sensitivity.json — recall/FPR when each threshold is perturbed by ±1
+  stage_contribution.json    — % of L2/L3 steps from stage-1 vs stage-2
 
 Usage:
-    PYTHONPATH=. python3 scripts/run_diagnostics.py [--tau-d 0.05 --tau-pi 0.10]
-    PYTHONPATH=. python3 scripts/run_diagnostics.py [--tau-pages 3 --tau-l3 2]
+    PYTHONPATH=. python3 scripts/run_diagnostics.py [--tau-d 10.0 --tau-pi 6]
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import random
-from collections import Counter, defaultdict
+from collections import Counter
 
 import pandas as pd
 
 from irrgate.config import load_settings
-from irrgate.taxonomy import severity_weight, Level
 
 
 # ---------------------------------------------------------------------------
-# Simulation helpers
+# Blocking predicate
 # ---------------------------------------------------------------------------
 
-def _blocked_disjunction(row, tau_d: float, tau_pi: float) -> bool:
-    if (row["peak_d_I"] or 0) <= 0:
-        return False
-    return (row["peak_d_I"] or 0) >= tau_d or (row["peak_pi"] or 0) >= tau_pi
-
-
-def _pages(row) -> float:
-    """n_distinct_pages_pre_se with NaN/None treated as 0."""
-    v = row.get("n_distinct_pages_pre_se") if isinstance(row, dict) else getattr(row, "n_distinct_pages_pre_se", None)
-    if v is None:
-        return 0.0
-    try:
-        if math.isnan(float(v)):
-            return 0.0
-    except (TypeError, ValueError):
-        pass
-    return float(v)
-
-
-def _blocked_shape(row, tau_pages: int, tau_l3: int) -> bool:
-    if (row["peak_d_I"] or 0) <= 0:
-        return False
-    return _pages(row) >= tau_pages or (row.get("n_l3_actions") or 0) >= tau_l3
-
-
-def _compute_profiles_alpha(
-    cache_rows: pd.DataFrame, alpha: float
-) -> tuple[float, float]:
-    """Re-compute peak_d_I and peak_pi for one trajectory using a different alpha."""
-    steps = cache_rows.sort_values("step_index")
-    levels = [Level(v) for v in steps["final_level"].tolist()]
-    target_bids = steps["target_bid"].tolist()
-
-    if not levels:
-        return 0.0, 0.0
-
-    severity_values = [severity_weight(lv, alpha) for lv in levels]
-    peak_d_I = 0.0
-    peak_pi  = 0.0
-    seen_bids: set[str] = set()
-    distinct_bids = [b for b in target_bids if b and not pd.isna(b)]
-    n_distinct = len(set(distinct_bids))
-
-    for k in range(len(levels)):
-        sevs_k = severity_values[: k + 1]
-        d_I_k = sum(sevs_k) / len(sevs_k)
-        total_w = sum(sevs_k)
-        if d_I_k > peak_d_I:
-            peak_d_I = d_I_k
-
-        bid_k = target_bids[k] if not pd.isna(target_bids[k]) else None
-        bid_term = (len(seen_bids) / n_distinct) if n_distinct > 0 else 1.0
-        residual = severity_values[k] * (1.0 - bid_term)
-
-        num = sum(
-            severity_values[j] * (1.0 - (
-                (len(set(target_bids[:j])) / n_distinct) if n_distinct > 0 else 1.0
-            ))
-            for j in range(k + 1)
-        )
-        pi_k = num / total_w if total_w > 0 else 0.0
-        if pi_k > peak_pi:
-            peak_pi = pi_k
-
-        if bid_k is not None:
-            seen_bids.add(bid_k)
-
-    return peak_d_I, peak_pi
+def _blocked(row, tau_d: float, tau_pi: int) -> bool:
+    return row.get("f", 0) == 1 and (
+        (row.get("d_I") or 0) >= tau_d or (row.get("irr_pos") or 0) >= tau_pi
+    )
 
 
 # ---------------------------------------------------------------------------
-# 1. Per-benchmark × per-model breakdown (generic)
+# 1. Per-benchmark × per-model breakdown
 # ---------------------------------------------------------------------------
 
-def per_benchmark_model(profiles: pd.DataFrame, blocked_fn) -> dict:
-    """Return recall/FPR per (benchmark, model) cell.
-
-    blocked_fn: callable(row: dict) -> bool
-    """
+def per_benchmark_model(profiles: pd.DataFrame, tau_d: float, tau_pi: int) -> dict:
     result = {}
     for (bench, model), grp in profiles.groupby(["benchmark", "model"]):
         pos = grp[grp["is_positive"]]
         neg = grp[~grp["is_positive"]]
-        tp = sum(blocked_fn(r) for r in pos.to_dict("records"))
-        fp = sum(blocked_fn(r) for r in neg.to_dict("records"))
-        recall = tp / len(pos) if len(pos) > 0 else None
-        fpr    = fp / len(neg) if len(neg) > 0 else None
+        tp = sum(_blocked(r, tau_d, tau_pi) for r in pos.to_dict("records"))
+        fp = sum(_blocked(r, tau_d, tau_pi) for r in neg.to_dict("records"))
         result[f"{bench}/{model}"] = {
             "n_pos": len(pos), "n_neg": len(neg),
-            "tp": tp, "fp": fp, "recall": recall, "fpr": fpr,
+            "tp": tp, "fp": fp,
+            "recall": tp / len(pos) if len(pos) > 0 else None,
+            "fpr": fp / len(neg) if len(neg) > 0 else None,
         }
     return result
 
@@ -141,13 +61,13 @@ def per_benchmark_model(profiles: pd.DataFrame, blocked_fn) -> dict:
 # 2. False negative enumeration
 # ---------------------------------------------------------------------------
 
-def enumerate_false_negatives_density(
-    profiles: pd.DataFrame, cache: pd.DataFrame, tau_d: float, tau_pi: float
+def enumerate_false_negatives(
+    profiles: pd.DataFrame, cache: pd.DataFrame, tau_d: float, tau_pi: int
 ) -> list[dict]:
     pos = profiles[profiles["is_positive"]]
     fns = []
     for r in pos.to_dict("records"):
-        if _blocked_disjunction(r, tau_d, tau_pi):
+        if _blocked(r, tau_d, tau_pi):
             continue
         reason = "f=0_classifier_gap" if r["f"] == 0 else "f=1_below_thresholds"
         traj_rows = cache[cache["trajectory_id"] == r["trajectory_id"]]
@@ -156,46 +76,15 @@ def enumerate_false_negatives_density(
                         if "stage_used" in traj_rows.columns else {})
         fns.append({
             "trajectory_id": r["trajectory_id"],
-            "task_id":        r["task_id"],
-            "model":          r["model"],
-            "benchmark":      r["benchmark"],
-            "f":              int(r["f"]),
-            "n_steps":        r["n_steps"],
-            "side_effect_step": r["side_effect_step"],
-            "peak_d_I":       r["peak_d_I"],
-            "peak_pi":        r["peak_pi"],
-            "d_I_at_side_effect_step": r["d_I_at_side_effect_step"],
-            "pi_at_side_effect_step":  r["pi_at_side_effect_step"],
-            "level_counts": {f"L{k}": int(v) for k, v in level_counts.items()},
-            "stage_counts": {str(k): int(v) for k, v in stage_counts.items()},
-            "fn_reason": reason,
-        })
-    return fns
-
-
-def enumerate_false_negatives_shape(
-    profiles: pd.DataFrame, cache: pd.DataFrame, tau_pages: int, tau_l3: int
-) -> list[dict]:
-    pos = profiles[profiles["is_positive"]]
-    fns = []
-    for r in pos.to_dict("records"):
-        if _blocked_shape(r, tau_pages, tau_l3):
-            continue
-        reason = "f=0_classifier_gap" if r["f"] == 0 else "f=1_below_thresholds"
-        traj_rows = cache[cache["trajectory_id"] == r["trajectory_id"]]
-        level_counts = traj_rows["final_level"].value_counts().to_dict()
-        stage_counts = (traj_rows["stage_used"].value_counts().to_dict()
-                        if "stage_used" in traj_rows.columns else {})
-        fns.append({
-            "trajectory_id":        r["trajectory_id"],
-            "task_id":              r["task_id"],
-            "model":                r["model"],
-            "benchmark":            r["benchmark"],
-            "f":                    int(r["f"]),
-            "n_steps":              r["n_steps"],
-            "side_effect_step":     r["side_effect_step"],
-            "n_distinct_pages_pre_se": _pages(r),
-            "n_l3_actions":         int(r.get("n_l3_actions") or 0),
+            "task_id": r["task_id"],
+            "model": r["model"],
+            "benchmark": r["benchmark"],
+            "f": int(r["f"]),
+            "n_steps": r["n_steps"],
+            "side_effect_step": r.get("side_effect_step"),
+            "d_I": r["d_I"],
+            "irr_pos": int(r["irr_pos"]),
+            "d_I_at_side_effect_step": r.get("d_I_at_side_effect_step"),
             "level_counts": {f"L{k}": int(v) for k, v in level_counts.items()},
             "stage_counts": {str(k): int(v) for k, v in stage_counts.items()},
             "fn_reason": reason,
@@ -223,133 +112,66 @@ def _heuristic_category(r: dict, level_counts: dict) -> str:
     return "d_other"
 
 
-def sample_false_positives_density(
-    profiles: pd.DataFrame, cache: pd.DataFrame, tau_d: float, tau_pi: float,
+def sample_false_positives(
+    profiles: pd.DataFrame, cache: pd.DataFrame, tau_d: float, tau_pi: int,
     seed: int = 42,
 ) -> list[dict]:
     neg = profiles[~profiles["is_positive"]]
-    fps = [r for r in neg.to_dict("records") if _blocked_disjunction(r, tau_d, tau_pi)]
+    fps = [r for r in neg.to_dict("records") if _blocked(r, tau_d, tau_pi)]
     rng = random.Random(seed)
     sample = rng.sample(fps, min(_FP_SAMPLE_N, len(fps)))
-
     annotated = []
     for r in sample:
         traj_rows = cache[cache["trajectory_id"] == r["trajectory_id"]]
         level_counts = traj_rows["final_level"].value_counts().to_dict()
         annotated.append({
             "trajectory_id": r["trajectory_id"],
-            "task_id":       r["task_id"],
-            "model":         r["model"],
-            "benchmark":     r["benchmark"],
-            "n_steps":       r["n_steps"],
-            "peak_d_I":      r["peak_d_I"],
-            "peak_pi":       r["peak_pi"],
-            "level_counts":  {f"L{k}": int(v) for k, v in level_counts.items()},
+            "task_id": r["task_id"],
+            "model": r["model"],
+            "benchmark": r["benchmark"],
+            "n_steps": r["n_steps"],
+            "d_I": r["d_I"],
+            "irr_pos": int(r["irr_pos"]),
+            "level_counts": {f"L{k}": int(v) for k, v in level_counts.items()},
             "heuristic_category": _heuristic_category(r, level_counts),
         })
     return annotated
 
 
-def sample_false_positives_shape(
-    profiles: pd.DataFrame, cache: pd.DataFrame, tau_pages: int, tau_l3: int,
-    seed: int = 42,
-) -> list[dict]:
-    neg = profiles[~profiles["is_positive"]]
-    fps = [r for r in neg.to_dict("records") if _blocked_shape(r, tau_pages, tau_l3)]
-    rng = random.Random(seed)
-    sample = rng.sample(fps, min(_FP_SAMPLE_N, len(fps)))
-
-    annotated = []
-    for r in sample:
-        traj_rows = cache[cache["trajectory_id"] == r["trajectory_id"]]
-        level_counts = traj_rows["final_level"].value_counts().to_dict()
-        annotated.append({
-            "trajectory_id":         r["trajectory_id"],
-            "task_id":               r["task_id"],
-            "model":                 r["model"],
-            "benchmark":             r["benchmark"],
-            "n_steps":               r["n_steps"],
-            "n_distinct_pages_pre_se": _pages(r),
-            "n_l3_actions":          int(r.get("n_l3_actions") or 0),
-            "level_counts":          {f"L{k}": int(v) for k, v in level_counts.items()},
-            "heuristic_category":    _heuristic_category(r, level_counts),
-        })
-    return annotated
-
-
 # ---------------------------------------------------------------------------
-# 4. Alpha sensitivity (density pass only)
+# 4. Threshold sensitivity
 # ---------------------------------------------------------------------------
 
-def alpha_sensitivity(
-    profiles: pd.DataFrame, cache: pd.DataFrame,
-    alpha_values: list[float], tau_d: float, tau_pi: float,
-) -> list[dict]:
-    cache_by_traj = {tid: grp for tid, grp in cache.groupby("trajectory_id")}
-    results = []
-    for alpha in alpha_values:
-        tp = fp = 0
-        n_pos = n_neg = 0
-        for r in profiles.to_dict("records"):
-            traj_rows = cache_by_traj.get(r["trajectory_id"])
-            if traj_rows is None:
-                continue
-            peak_d, peak_pi = _compute_profiles_alpha(traj_rows, alpha)
-            blocked = peak_d > 0 and (peak_d >= tau_d or peak_pi >= tau_pi)
-            if r["is_positive"]:
-                n_pos += 1
-                if blocked:
-                    tp += 1
-            else:
-                n_neg += 1
-                if blocked:
-                    fp += 1
-        results.append({
-            "alpha": alpha,
-            "tau_d": tau_d, "tau_pi": tau_pi,
-            "recall": tp / n_pos if n_pos else 0.0,
-            "fpr":    fp / n_neg if n_neg else 0.0,
-            "tp": tp, "fp": fp, "n_pos": n_pos, "n_neg": n_neg,
-        })
-    return results
-
-
-# ---------------------------------------------------------------------------
-# 4b. Threshold sensitivity (shape pass only)
-# ---------------------------------------------------------------------------
-
-def threshold_sensitivity_shape(
-    profiles: pd.DataFrame, tau_pages: int, tau_l3: int
+def threshold_sensitivity(
+    profiles: pd.DataFrame, tau_d: float, tau_pi: int
 ) -> dict:
-    """Perturb each threshold by ±1 and report recall/FPR for pages_disj_l3."""
+    """Report recall/FPR when each threshold is perturbed by ±1 step."""
     pos = profiles[profiles["is_positive"]].to_dict("records")
     neg = profiles[~profiles["is_positive"]].to_dict("records")
     n_pos, n_neg = len(pos), len(neg)
-
-    # Baseline + four perturbations; clamp thresholds to ≥ 1
     configs = {
-        "baseline":              (tau_pages,      tau_l3),
-        "tau_pages_minus_1":     (max(1, tau_pages - 1), tau_l3),
-        "tau_pages_plus_1":      (tau_pages + 1,  tau_l3),
-        "tau_l3_minus_1":        (tau_pages,       max(1, tau_l3 - 1)),
-        "tau_l3_plus_1":         (tau_pages,       tau_l3 + 1),
+        "baseline":          (tau_d,               tau_pi),
+        "tau_d_minus_1":     (max(0.0, tau_d - 1.0), tau_pi),
+        "tau_d_plus_1":      (tau_d + 1.0,         tau_pi),
+        "tau_pi_minus_1": (tau_d,                max(1, tau_pi - 1)),
+        "tau_pi_plus_1":  (tau_d,                tau_pi + 1),
     }
-
     results = {}
-    for label, (tp_val, tl_val) in configs.items():
-        tp = sum(1 for r in pos if _blocked_shape(r, tp_val, tl_val))
-        fp = sum(1 for r in neg if _blocked_shape(r, tp_val, tl_val))
+    for label, (td, tp) in configs.items():
+        blocked_pos = sum(1 for r in pos if _blocked(r, td, tp))
+        blocked_neg = sum(1 for r in neg if _blocked(r, td, tp))
         results[label] = {
-            "tau_pages": tp_val, "tau_l3": tl_val,
-            "recall": tp / n_pos if n_pos else 0.0,
-            "fpr":    fp / n_neg if n_neg else 0.0,
-            "tp": tp, "fp": fp, "n_pos": n_pos, "n_neg": n_neg,
+            "tau_d": td, "tau_pi": tp,
+            "recall": blocked_pos / n_pos if n_pos else 0.0,
+            "fpr": blocked_neg / n_neg if n_neg else 0.0,
+            "tp": blocked_pos, "fp": blocked_neg,
+            "n_pos": n_pos, "n_neg": n_neg,
         }
     return results
 
 
 # ---------------------------------------------------------------------------
-# 5. Stage contribution (shared, identical for both passes)
+# 5. Stage contribution
 # ---------------------------------------------------------------------------
 
 def stage_contribution(cache: pd.DataFrame) -> dict:
@@ -364,7 +186,7 @@ def stage_contribution(cache: pd.DataFrame) -> dict:
         "total_L2L3_steps": total,
         "stage1_count": s1, "stage1_pct": s1 / total,
         "stage2_count": s2, "stage2_pct": s2 / total,
-        "other_count":  total - s1 - s2,
+        "other_count": total - s1 - s2,
     }
 
 
@@ -380,172 +202,81 @@ def main() -> None:
     parser.add_argument("--cv-results", default="results/cv/cv_results.json",
                         help="CV results JSON to read selected thresholds from")
     parser.add_argument("--tau-d",     type=float, default=None,
-                        help="Override tau_d for density pass")
-    parser.add_argument("--tau-pi",    type=float, default=None,
-                        help="Override tau_pi for density pass")
-    parser.add_argument("--tau-pages", type=int,   default=None,
-                        help="Override tau_pages for shape pass")
-    parser.add_argument("--tau-l3",    type=int,   default=None,
-                        help="Override tau_l3 for shape pass")
+                        help="Override tau_d (default: modal CV-selected value)")
+    parser.add_argument("--tau-pi", type=int,   default=None,
+                        help="Override tau_pi (default: modal CV-selected value)")
     parser.add_argument("--output-dir", default="results/diagnostics")
     args = parser.parse_args()
 
-    # ---- Determine thresholds: CLI > cv_results.json (modal) > settings.json ----
     tau_d     = args.tau_d
-    tau_pi    = args.tau_pi
-    tau_pages = args.tau_pages
-    tau_l3    = args.tau_l3
+    tau_pi = args.tau_pi
 
     if os.path.exists(args.cv_results):
         with open(args.cv_results) as fh:
             cv = json.load(fh)
+        if "irrgate" in cv:
+            counts = cv["irrgate"].get("tau_selection_counts", {})
+            if tau_d is None and counts.get("tau_d_counts"):
+                tau_d = float(max(counts["tau_d_counts"], key=counts["tau_d_counts"].get))
+            if tau_pi is None and counts.get("tau_pi_counts"):
+                tau_pi = int(max(counts["tau_pi_counts"], key=counts["tau_pi_counts"].get))
 
-        if "pass_a_density" in cv:
-            # New combined structure (Pass A + Pass B)
-            a_counts = cv["pass_a_density"]["tau_selection_counts"]
-            if tau_d is None and a_counts.get("tau_d_counts"):
-                tau_d = float(max(a_counts["tau_d_counts"],
-                                  key=a_counts["tau_d_counts"].get))
-            if tau_pi is None and a_counts.get("tau_pi_counts"):
-                tau_pi = float(max(a_counts["tau_pi_counts"],
-                                   key=a_counts["tau_pi_counts"].get))
-            if "pass_b_shape" in cv:
-                b_counts = cv["pass_b_shape"]["tau_selection_counts"]
-                if tau_pages is None and b_counts.get("tau_pages_counts"):
-                    tau_pages = int(max(b_counts["tau_pages_counts"],
-                                       key=b_counts["tau_pages_counts"].get))
-                if tau_l3 is None and b_counts.get("tau_l3_counts"):
-                    tau_l3 = int(max(b_counts["tau_l3_counts"],
-                                     key=b_counts["tau_l3_counts"].get))
-        else:
-            # Old flat structure (backward compat with pre-Pass-B cv_results.json)
-            tau_d_counts  = cv.get("tau_d_selection_counts", {})
-            tau_pi_counts = cv.get("tau_pi_selection_counts", {})
-            if tau_d is None and tau_d_counts:
-                tau_d  = float(max(tau_d_counts,  key=tau_d_counts.get))
-            if tau_pi is None and tau_pi_counts:
-                tau_pi = float(max(tau_pi_counts, key=tau_pi_counts.get))
+    if tau_d     is None: tau_d     = float(s.get("tau_d", 5.0))
+    if tau_pi is None: tau_pi = int(s.get("tau_pi", 5))
 
-    # Fall back to settings.json / module defaults
-    if tau_d     is None: tau_d     = float(s.get("tau_d",  0.15))
-    if tau_pi    is None: tau_pi    = float(s.get("tau_pi", 0.30))
-    if tau_pages is None: tau_pages = 3   # sensible default if no CV result
-    if tau_l3    is None: tau_l3    = 2
+    print(f"[diagnostics] thresholds: tau_d={tau_d}  tau_pi={tau_pi}")
 
-    print(f"[diagnostics] density thresholds: tau_d={tau_d}  tau_pi={tau_pi}")
-    print(f"[diagnostics] shape  thresholds:  tau_pages={tau_pages}  tau_l3={tau_l3}")
-
-    # Load data
     profiles = pd.read_parquet(args.profiles)
     cache    = pd.read_parquet(args.cache)
     print(f"[diagnostics] loaded {len(profiles)} trajectories, {len(cache)} cache rows")
 
-    # Stage contribution is identical for both passes
-    sc = stage_contribution(cache)
+    os.makedirs(args.output_dir, exist_ok=True)
 
-    out_density = os.path.join(args.output_dir, "density")
-    out_shape   = os.path.join(args.output_dir, "shape")
-    os.makedirs(out_density, exist_ok=True)
-    os.makedirs(out_shape,   exist_ok=True)
-
-    # ================================================================
-    # Density pass
-    # ================================================================
-    print("\n[diagnostics] === Density pass (disjunction) ===")
-    blocked_dens = lambda r: _blocked_disjunction(r, tau_d, tau_pi)
-
-    print("[diagnostics] 1. per-benchmark/model breakdown (density)...")
-    bm_d = per_benchmark_model(profiles, blocked_dens)
-    p = os.path.join(out_density, "per_benchmark_model.json")
+    print("[diagnostics] 1. per-benchmark/model breakdown...")
+    bm = per_benchmark_model(profiles, tau_d, tau_pi)
+    p = os.path.join(args.output_dir, "per_benchmark_model.json")
     with open(p, "w") as fh:
-        json.dump(bm_d, fh, indent=2)
-    print(f"  → {p} ({len(bm_d)} groups)")
+        json.dump(bm, fh, indent=2)
+    print(f"  → {p} ({len(bm)} groups)")
 
-    print("[diagnostics] 2. false negative enumeration (density)...")
-    fns_d = enumerate_false_negatives_density(profiles, cache, tau_d, tau_pi)
-    p = os.path.join(out_density, "false_negatives.json")
+    print("[diagnostics] 2. false negative enumeration...")
+    fns = enumerate_false_negatives(profiles, cache, tau_d, tau_pi)
+    p = os.path.join(args.output_dir, "false_negatives.json")
     with open(p, "w") as fh:
-        json.dump(fns_d, fh, indent=2)
-    fn_f0    = sum(1 for x in fns_d if x["fn_reason"] == "f=0_classifier_gap")
-    fn_below = sum(1 for x in fns_d if x["fn_reason"] == "f=1_below_thresholds")
-    print(f"  → {p}  ({len(fns_d)} FNs: f=0 gap={fn_f0}, f=1 below-threshold={fn_below})")
+        json.dump(fns, fh, indent=2)
+    fn_f0    = sum(1 for x in fns if x["fn_reason"] == "f=0_classifier_gap")
+    fn_below = sum(1 for x in fns if x["fn_reason"] == "f=1_below_thresholds")
+    print(f"  → {p}  ({len(fns)} FNs: f=0 gap={fn_f0}, f=1 below-threshold={fn_below})")
 
-    print("[diagnostics] 3. FP sample (density)...")
-    fps_d = sample_false_positives_density(profiles, cache, tau_d, tau_pi)
-    p = os.path.join(out_density, "fp_sample.json")
+    print("[diagnostics] 3. FP sample...")
+    fps = sample_false_positives(profiles, cache, tau_d, tau_pi)
+    p = os.path.join(args.output_dir, "fp_sample.json")
     with open(p, "w") as fh:
-        json.dump(fps_d, fh, indent=2)
-    cat_counts = Counter(x["heuristic_category"] for x in fps_d)
-    print(f"  → {p}  ({len(fps_d)} FPs sampled)")
+        json.dump(fps, fh, indent=2)
+    cat_counts = Counter(x["heuristic_category"] for x in fps)
+    print(f"  → {p}  ({len(fps)} FPs sampled)")
     for cat, cnt in sorted(cat_counts.items()):
         print(f"     {cat}: {cnt}")
 
-    print("[diagnostics] 4. alpha sensitivity (density only)...")
-    alpha_vals = [0.25, 0.5, 0.75, 1.0]
-    alpha_res = alpha_sensitivity(profiles, cache, alpha_vals, tau_d, tau_pi)
-    p = os.path.join(out_density, "alpha_sensitivity.json")
+    print("[diagnostics] 4. threshold sensitivity...")
+    ts = threshold_sensitivity(profiles, tau_d, tau_pi)
+    p = os.path.join(args.output_dir, "threshold_sensitivity.json")
     with open(p, "w") as fh:
-        json.dump(alpha_res, fh, indent=2)
+        json.dump(ts, fh, indent=2)
     print(f"  → {p}")
-    for row in alpha_res:
-        print(f"     α={row['alpha']}  recall={row['recall']:.3f}  fpr={row['fpr']:.3f}")
+    for label, row in ts.items():
+        print(f"     {label:<22}  τ_d={row['tau_d']} τ_pi={row['tau_pi']}"
+              f"  recall={row['recall']:.3f}  fpr={row['fpr']:.3f}")
 
-    print("[diagnostics] 5. stage contribution (density)...")
-    p = os.path.join(out_density, "stage_contribution.json")
+    print("[diagnostics] 5. stage contribution...")
+    sc = stage_contribution(cache)
+    p = os.path.join(args.output_dir, "stage_contribution.json")
     with open(p, "w") as fh:
         json.dump(sc, fh, indent=2)
     print(f"  → {p}")
     print(f"     L2/L3 steps: {sc['total_L2L3_steps']}"
           f"  stage-1: {sc['stage1_count']} ({sc['stage1_pct']:.1%})"
           f"  stage-2: {sc['stage2_count']} ({sc['stage2_pct']:.1%})")
-
-    # ================================================================
-    # Shape pass
-    # ================================================================
-    print("\n[diagnostics] === Shape pass (pages_disj_l3) ===")
-    blocked_shape = lambda r: _blocked_shape(r, tau_pages, tau_l3)
-
-    print("[diagnostics] 1. per-benchmark/model breakdown (shape)...")
-    bm_s = per_benchmark_model(profiles, blocked_shape)
-    p = os.path.join(out_shape, "per_benchmark_model.json")
-    with open(p, "w") as fh:
-        json.dump(bm_s, fh, indent=2)
-    print(f"  → {p} ({len(bm_s)} groups)")
-
-    print("[diagnostics] 2. false negative enumeration (shape)...")
-    fns_s = enumerate_false_negatives_shape(profiles, cache, tau_pages, tau_l3)
-    p = os.path.join(out_shape, "false_negatives.json")
-    with open(p, "w") as fh:
-        json.dump(fns_s, fh, indent=2)
-    fn_f0    = sum(1 for x in fns_s if x["fn_reason"] == "f=0_classifier_gap")
-    fn_below = sum(1 for x in fns_s if x["fn_reason"] == "f=1_below_thresholds")
-    print(f"  → {p}  ({len(fns_s)} FNs: f=0 gap={fn_f0}, f=1 below-threshold={fn_below})")
-
-    print("[diagnostics] 3. FP sample (shape)...")
-    fps_s = sample_false_positives_shape(profiles, cache, tau_pages, tau_l3)
-    p = os.path.join(out_shape, "fp_sample.json")
-    with open(p, "w") as fh:
-        json.dump(fps_s, fh, indent=2)
-    cat_counts = Counter(x["heuristic_category"] for x in fps_s)
-    print(f"  → {p}  ({len(fps_s)} FPs sampled)")
-    for cat, cnt in sorted(cat_counts.items()):
-        print(f"     {cat}: {cnt}")
-
-    print("[diagnostics] 4. threshold sensitivity (shape only)...")
-    ts = threshold_sensitivity_shape(profiles, tau_pages, tau_l3)
-    p = os.path.join(out_shape, "threshold_sensitivity.json")
-    with open(p, "w") as fh:
-        json.dump(ts, fh, indent=2)
-    print(f"  → {p}")
-    for label, row in ts.items():
-        print(f"     {label:<22}  τ_pages={row['tau_pages']} τ_l3={row['tau_l3']}"
-              f"  recall={row['recall']:.3f}  fpr={row['fpr']:.3f}")
-
-    print("[diagnostics] 5. stage contribution (shape)...")
-    p = os.path.join(out_shape, "stage_contribution.json")
-    with open(p, "w") as fh:
-        json.dump(sc, fh, indent=2)
-    print(f"  → {p}  (identical to density pass — classification is the same)")
 
     print("\n[diagnostics] done.")
 

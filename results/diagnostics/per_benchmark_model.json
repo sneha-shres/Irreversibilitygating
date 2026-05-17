@@ -2,65 +2,65 @@
   "webarena/GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct": {
     "n_pos": 11,
     "n_neg": 89,
-    "tp": 11,
-    "fp": 38,
-    "recall": 1.0,
-    "fpr": 0.42696629213483145
+    "tp": 4,
+    "fp": 14,
+    "recall": 0.36363636363636365,
+    "fpr": 0.15730337078651685
   },
   "webarena/GenericAgent-anthropic_claude-3.7-sonnet": {
     "n_pos": 9,
     "n_neg": 91,
-    "tp": 9,
-    "fp": 37,
-    "recall": 1.0,
-    "fpr": 0.4065934065934066
+    "tp": 5,
+    "fp": 11,
+    "recall": 0.5555555555555556,
+    "fpr": 0.12087912087912088
   },
   "webarena/GenericAgent-gpt-4o-2024-11-20": {
     "n_pos": 8,
     "n_neg": 92,
-    "tp": 6,
-    "fp": 39,
-    "recall": 0.75,
-    "fpr": 0.42391304347826086
+    "tp": 5,
+    "fp": 13,
+    "recall": 0.625,
+    "fpr": 0.14130434782608695
   },
   "webarena/GenericAgent-meta-llama_Llama-3.3-70B-Instruct": {
     "n_pos": 4,
     "n_neg": 94,
-    "tp": 3,
-    "fp": 41,
-    "recall": 0.75,
-    "fpr": 0.43617021276595747
+    "tp": 2,
+    "fp": 18,
+    "recall": 0.5,
+    "fpr": 0.19148936170212766
   },
   "workarena/GenericAgent-Qwen_Qwen2.5-VL-72B-Instruct": {
     "n_pos": 3,
     "n_neg": 115,
-    "tp": 2,
-    "fp": 35,
-    "recall": 0.6666666666666666,
-    "fpr": 0.30434782608695654
+    "tp": 0,
+    "fp": 1,
+    "recall": 0.0,
+    "fpr": 0.008695652173913044
   },
   "workarena/GenericAgent-anthropic_claude-3.7-sonnet": {
     "n_pos": 8,
     "n_neg": 110,
-    "tp": 7,
-    "fp": 45,
-    "recall": 0.875,
-    "fpr": 0.4090909090909091
+    "tp": 4,
+    "fp": 10,
+    "recall": 0.5,
+    "fpr": 0.09090909090909091
   },
   "workarena/GenericAgent-gpt-4o-2024-11-20": {
     "n_pos": 6,
     "n_neg": 112,
     "tp": 5,
-    "fp": 31,
+    "fp": 9,
     "recall": 0.8333333333333334,
-    "fpr": 0.2767857142857143
+    "fpr": 0.08035714285714286
   },
   "workarena/GenericAgent-meta-llama_Llama-3.3-70B-Instruct": {
     "n_pos": 5,
     "n_neg": 113,
-    "tp": 4,
-    "fp": 35,
-    "recall": 0.8,
-    "fpr": 0.30973451327433627
+    "tp": 3,
+    "fp": 5,
+    "recall": 0.6,
+    "fpr": 0.04424778761061947
   }
 }

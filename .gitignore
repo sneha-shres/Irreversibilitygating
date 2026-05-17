@@ -1,3 +1,10 @@
 .env
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.log
+CLAUDE.md
 data/
-
+results/
+config/settings.json
