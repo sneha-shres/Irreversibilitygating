@@ -13,12 +13,12 @@ agent proposes action
         ↓
 classify trajectory-so-far by reversibility level (L0–L3)
         ↓
-compute risk profile (f, d_I, irr_pos)
+compute risk profile (f, d_I, p_I)
         ↓
 gate_decision(profile, τ_d, τ_π) → approve or block
 ```
 
-**Gate policy (irr_gate):** block iff `f=1` and (`d_I ≥ τ_d` or `irr_pos ≥ τ_π`). No LLM at gate time.
+**Gate policy (irr_gate):** block iff `f=1` and (`d_I ≥ τ_d` or `p_I ≥ τ_π`). No LLM at gate time.
 
 In the retrospective evaluation, completed trajectories are replayed to determine at which step IrrGate would have first intervened.
 
@@ -35,7 +35,7 @@ In the retrospective evaluation, completed trajectories are replayed to determin
 
 - **f**: 1 if any action has severity > 0 (any L2/L3 step), else 0
 - **d_I**: absolute cumulative severity sum across all steps — NOT a mean; monotone increasing, avoids the length-dilution problem of density
-- **irr_pos**: count of distinct page URLs from step 0 up to and including the last L2/L3 step; captures how broadly the agent explored before its last risky action
+- **p_I**: count of distinct page URLs from step 0 up to and including the last L2/L3 step; captures how broadly the agent explored before its last risky action
 
 ### Gate decision
 
@@ -129,52 +129,6 @@ Grid: τ_d ∈ {0.5–20.0}, τ_π ∈ {1–10}. Modal CV-selected: **τ_d = 10.
 - **FPR budget met.** irr_gate strictly dominates both single-feature variants on both metrics
 - irr_positional_only contributes the larger share of recall; the d_I term adds +12.9pp recall at +4.7pp FPR cost
 
-### Full-dataset performance
-
-| Setting | Recall | FPR |
-|---------|--------|-----|
-| f_only (recall ceiling) | 88.9% (48/54) | 38.7% |
-| irr_gate at τ_d=10.0, τ_π=6 (held-out CV) | 47.0% | 9.7% |
-| irr_gate at τ_d=10.0, τ_π=6 (full dataset) | 51.9% (28/54) | 9.9% |
-
-### Per-benchmark breakdown (irr_gate, τ_d=10.0, τ_π=6)
-
-| Benchmark | Model | Pos | Neg | Recall | FPR |
-|-----------|-------|-----|-----|--------|-----|
-| WebArena | Qwen 2.5-VL-72B | 11 | 89 | 0.364 | 0.157 |
-| WebArena | Claude 3.7 Sonnet | 9 | 91 | 0.556 | 0.121 |
-| WebArena | GPT-4o | 8 | 92 | 0.625 | 0.141 |
-| WebArena | Llama 3.3-70B | 4 | 94 | 0.500 | 0.191 |
-| WorkArena | Claude 3.7 Sonnet | 8 | 110 | 0.500 | 0.091 |
-| WorkArena | GPT-4o | 6 | 112 | 0.833 | 0.080 |
-| WorkArena | Llama 3.3-70B | 5 | 113 | 0.600 | 0.044 |
-| WorkArena | Qwen 2.5-VL-72B | 3 | 115 | 0.000 | 0.009 |
-
-### Alpha sensitivity (irr_gate, τ_d=10.0, τ_π=6)
-
-α (severity weight for L2 actions) is **inert**: recall and FPR change by < 0.01 across α ∈ {0.25, 1.0}.
-
-### Stage contribution
-
-Of 2,676 L2/L3 classification steps: **94.4% from stage-1** (rule-based), 5.6% from stage-2 (Gemini). Stage-2 adds coverage with minimal API cost.
-
-### False negative analysis (τ_d=10.0, τ_π=6)
-
-**26 false negatives total:**
-- **6 permanent f=0 misses** — IrrGate found no L2/L3 action (taxonomy boundary: `send_msg_to_user` only)
-- **20 f=1 below thresholds** — trajectory had a risky step but peak d_I < 10.0 and irr_pos < 6
-
-### Threshold sensitivity (τ_d=10.0, τ_π=6 baseline)
-
-| Config | τ_d | τ_π | Recall | FPR |
-|--------|-----|---------|--------|-----|
-| baseline | 10.0 | 6 | 0.519 | 0.099 |
-| τ_d − 1 | 9.0 | 6 | 0.519 | 0.105 |
-| τ_d + 1 | 11.0 | 6 | 0.519 | 0.098 |
-| τ_π − 1 | 10.0 | 5 | 0.630 | 0.124 |
-| τ_π + 1 | 10.0 | 7 | 0.481 | 0.087 |
-
-**τ_d is inert at this operating point** — changing it by ±1 does not move recall at all. τ_π is the sole active lever.
 
 ## Project Structure
 
@@ -210,21 +164,3 @@ config/
 └── settings.json             # Active tau_d, tau_pi (written by analyze_thresholds.py)
 ```
 
-## Hyperparameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `ALPHA` | 0.5 | Severity weight for L2 actions (fixed, not tuned — inert on this dataset) |
-| `BETA` | 0.1 | Severity weight for L1 actions (minor contribution to d_I) |
-| `TAU_D` | 5.0 | d_I threshold for blocking (CV-selected: 10.0) |
-| `TAU_PI` | 5 | irr_pos threshold for blocking (CV-selected: 6) |
-
-Active values are read from `config/settings.json`; CLI flags take precedence.
-
-## Limitations
-
-- **FPR–recall tradeoff:** At CV-selected thresholds (τ_d=10.0, τ_π=6), irr_gate achieves recall 47.0% under held-out CV with FPR 9.7%. The FPR budget is met but recall is limited.
-- **Hard negatives:** 304 of 816 negatives reach f=1 from task-required L3 actions. The gate cannot distinguish one correct irreversible action from an accidental one without intent information — fundamental design tradeoff.
-- **irr_positional_only dominates recall:** The d_I term alone achieves only 17.0% recall at τ_d=10.0; irr_pos contributes most of the gate's discriminative power.
-- **α is inert:** ALPHA=0.5 has no empirical basis on this dataset; sensitivity is flat across α ∈ {0.25, 1.0}.
-- **6 permanent f=0 misses:** Pure communicative trajectories (`send_msg_to_user` only) that annotators labeled as side effects — a taxonomy boundary, not a bug.
