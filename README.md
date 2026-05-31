@@ -206,18 +206,9 @@ results/
 ├── profiles/                 # profiles.parquet (one row per trajectory)
 ├── cv/                       # cv_results.json (irr_gate CV; Wilson CIs; tau selection)
 └── diagnostics/              # FN list, FP sample, threshold sensitivity, stage contribution
-tests/                        # pytest test suite
 config/
 └── settings.json             # Active tau_d, tau_pi (written by analyze_thresholds.py)
 ```
-
-## Running Tests
-
-```bash
-PYTHONPATH=. python -m pytest tests/ -q
-```
-
-2 pre-existing failures in `test_loader` are unrelated to core gating logic.
 
 ## Hyperparameters
 
