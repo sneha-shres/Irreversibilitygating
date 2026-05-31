@@ -1,18 +1,8 @@
-"""Compute full-trajectory risk profiles for all 870 trajectories.
+"""Compute per-trajectory risk profiles from the classification cache.
 
-Reads classification levels from data/classification_cache.parquet (no LLM calls)
-and action data from the raw trajectory files, then computes the three IrrGate features:
-
-  f                        — irreversibility presence (1 iff any L2/L3 step)
-  d_I                      — irreversibility density: absolute cumulative severity (sum, not mean)
-  irr_pos                  — irreversibility positional risk: distinct pages up to last L2/L3
-  side_effect_step         — index of last L2/L3 step (None if f=0)
-  d_I_at_side_effect_step  — density at that step (None if f=0)
-
-Output: results/profiles/profiles.parquet  (one row per trajectory)
-
-Usage:
-    PYTHONPATH=. python3 scripts/compute_profiles.py
+Reads `data/classification_cache.parquet` and raw trajectory files to compute
+`f`, `d_I`, and `irr_pos` for each trajectory, then writes
+`results/profiles/profiles.parquet`.
 """
 
 from __future__ import annotations
@@ -44,7 +34,7 @@ def _find_trajectory_file(task_id: str, model: str, trajectory_dir: str) -> str:
     direct = os.path.join(trajectory_dir, f"{task_id}.json")
     if os.path.exists(direct):
         return direct
-    raise FileNotFoundError(f"Trajectory for {task_id!r} / {model!r} not found in {trajectory_dir}")
+    raise FileNotFoundError(f"Trajectory {task_id!r} / {model!r} not found in {trajectory_dir}")
 
 
 def _mannwhitney_auc(pos_vals: list[float], neg_vals: list[float]) -> float:

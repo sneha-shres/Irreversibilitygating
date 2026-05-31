@@ -11,11 +11,8 @@ _LABEL_FIELD_PATTERN = re.compile(
     r"(?:name|label|text|placeholder|content)\s*=\s*'((?:[^'\\]|\\.)*)'",
     re.IGNORECASE,
 )
-# BrowserGym AX-tree format: `[bid] role 'name', attr=val, ...`. The accessible
-# name is the first single-quoted string after the role token; capture it.
-_ROLE_NAME_PATTERN = re.compile(
-    r"\[[^\]]+\]\s+\S+\s+'((?:[^'\\]|\\.)*)'",
-)
+# BrowserGym AX-tree: `[bid] role 'name', ...`. Capture the accessible name.
+_ROLE_NAME_PATTERN = re.compile(r"\[[^\]]+\]\s+\S+\s+'((?:[^'\\]|\\.)*)'")
 
 
 @dataclass
@@ -35,11 +32,9 @@ class Action:
         raw = str(step.get("action", ""))
         action_type, target_bid, fill_text, target_url = parse_action_string(raw)
         axtree = step.get("axtree")
-        target_element_text = (
-            extract_element_text_from_axtree(str(axtree), target_bid)
-            if target_bid and axtree is not None
-            else None
-        )
+        target_element_text = None
+        if target_bid and axtree is not None:
+            target_element_text = extract_element_text_from_axtree(str(axtree), target_bid)
 
         return cls(
             action_type=action_type,

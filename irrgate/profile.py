@@ -17,16 +17,10 @@ class RiskProfile:
 def compute_risk_profile(levels: list[Level], actions: list[Action]) -> RiskProfile:
     severity_values = [severity_weight(level, ALPHA, BETA) for level in levels]
 
-    # Presence: L2 or L3 actions indicate side-effect potential
     f = int(any(level in {Level.L2, Level.L3} for level in levels))
-
-    # Density: absolute (cumulative) severity — sum over all steps, not divided by n_steps.
-    # Avoids the length-dilution problem where a single L3 in a long trajectory looks low-risk.
     d_I = sum(severity_values)
 
-    # Positional risk: distinct pages visited up to and including the last L2/L3 step.
-    # Snapshots the page set at each L2/L3 step; the final snapshot covers the widest
-    # exploration window, capturing how much the agent traversed before its final risky act.
+    # irr_pos: number of distinct pages visited up to the last L2/L3 step.
     pages_pre_last_se: set[str] = set()
     current_pages: set[str] = set()
     last_se_found = False

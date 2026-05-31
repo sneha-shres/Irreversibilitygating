@@ -19,7 +19,7 @@ class TrajectoryResult:
 
 
 def evaluate_trajectory(trajectory: Trajectory, config: Config) -> TrajectoryResult:
-    """Evaluate each step incrementally, classifying each action exactly once."""
+    """Run the gate incrementally over `trajectory` and return results."""
     step_decisions: list[GateDecision] = []
     first_blocking_step: int | None = None
 
@@ -40,11 +40,9 @@ def evaluate_trajectory(trajectory: Trajectory, config: Config) -> TrajectoryRes
             first_blocking_step = step_index
             break
 
-    reached_completion = first_blocking_step is None
-
     return TrajectoryResult(
         trajectory=trajectory,
         step_decisions=step_decisions,
         first_blocking_step=first_blocking_step,
-        reached_completion=reached_completion,
+        reached_completion=(first_blocking_step is None),
     )

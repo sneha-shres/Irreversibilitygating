@@ -1,4 +1,4 @@
-"""Configuration and constants for the IrrGate evaluation project."""
+"""Configuration and constants for the IrrGate project."""
 
 import json
 from dataclasses import dataclass
@@ -24,14 +24,14 @@ _SETTINGS_PATH = Path(__file__).resolve().parents[1] / "config" / "settings.json
 
 
 def load_settings() -> dict:
-    """Load config/settings.json. Returns empty dict if file is missing."""
+    """Load `config/settings.json`. Return {} if missing."""
     if _SETTINGS_PATH.exists():
         return json.loads(_SETTINGS_PATH.read_text(encoding="utf-8"))
     return {}
 
 
 def save_settings(updates: dict) -> None:
-    """Merge updates into config/settings.json and write it back."""
+    """Merge `updates` into settings file and write it."""
     settings = load_settings()
     settings.update(updates)
     _SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)

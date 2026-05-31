@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import time
 from pathlib import Path
 
-import pandas as pd
 from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import HfHubHTTPError
 
@@ -32,52 +30,38 @@ def download_repo_file(repo_path: str, output_dir: Path, max_attempts: int = 3) 
             )
             return Path(downloaded)
         except (HfHubHTTPError, OSError) as exc:
-            logging.warning(
-                "Attempt %d/%d failed downloading %s: %s",
-                attempt,
-                max_attempts,
-                repo_path,
-                exc,
-            )
+            logging.warning("Attempt %d/%d failed downloading %s: %s", attempt, max_attempts, repo_path, exc)
             if attempt == max_attempts:
                 raise
             time.sleep(2**attempt)
 
 
 def trajectory_candidates(benchmark: str, model: str, task_id: str) -> list[str]:
-    benchmark_key = benchmark.lower()
+    key = benchmark.lower()
     candidates: list[str] = []
 
-    if benchmark_key == "webarena":
-        candidates.extend(
-            [
-                f"cleaned/webarena/{model}/{model}_on_webarena/{task_id}.json",
-                f"cleaned/webarena/{model}/{model}_on_webarena/webarena.{task_id}.json",
-            ]
-        )
+    if key == "webarena":
+        candidates.extend([
+            f"cleaned/webarena/{model}/{model}_on_webarena/{task_id}.json",
+            f"cleaned/webarena/{model}/{model}_on_webarena/webarena.{task_id}.json",
+        ])
         if task_id.startswith("webarena."):
             stripped = task_id.split(".", 1)[1]
-            candidates.extend(
-                [
-                    f"cleaned/webarena/{model}/{model}_on_webarena/{stripped}.json",
-                    f"cleaned/webarena/{model}/{model}_on_webarena/webarena.{stripped}.json",
-                ]
-            )
-    elif benchmark_key == "workarena":
-        candidates.extend(
-            [
-                f"cleaned/workarena/{model}/{model}_on_workarena.servicenow/{task_id}.json",
-                f"cleaned/workarena/{model}/{model}_on_workarena.servicenow/workarena.servicenow.{task_id}.json",
-            ]
-        )
+            candidates.extend([
+                f"cleaned/webarena/{model}/{model}_on_webarena/{stripped}.json",
+                f"cleaned/webarena/{model}/{model}_on_webarena/webarena.{stripped}.json",
+            ])
+    elif key == "workarena":
+        candidates.extend([
+            f"cleaned/workarena/{model}/{model}_on_workarena.servicenow/{task_id}.json",
+            f"cleaned/workarena/{model}/{model}_on_workarena.servicenow/workarena.servicenow.{task_id}.json",
+        ])
         if task_id.startswith("workarena.servicenow."):
             stripped = task_id.split(".", 2)[-1]
-            candidates.extend(
-                [
-                    f"cleaned/workarena/{model}/{model}_on_workarena.servicenow/{stripped}.json",
-                    f"cleaned/workarena/{model}/{model}_on_workarena.servicenow/workarena.servicenow.{stripped}.json",
-                ]
-            )
+            candidates.extend([
+                f"cleaned/workarena/{model}/{model}_on_workarena.servicenow/{stripped}.json",
+                f"cleaned/workarena/{model}/{model}_on_workarena.servicenow/workarena.servicenow.{stripped}.json",
+            ])
 
     return candidates
 
@@ -89,11 +73,7 @@ def download_data(output_dir: Path) -> None:
     annotations = load_annotations(str(annotations_path))
     filtered = annotations[annotations["benchmark"].str.lower().isin(TARGET_BENCHMARKS)]
 
-    logging.info(
-        "Preparing to download %d trajectories from %s",
-        len(filtered),
-        DATASET_REPO,
-    )
+    logging.info("Preparing to download %d trajectories from %s", len(filtered), DATASET_REPO)
 
     for _, row in filtered.iterrows():
         benchmark = str(row["benchmark"]).strip()
@@ -115,11 +95,7 @@ def download_data(output_dir: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Download AgentRewardBench WebArena and WorkArena files.")
-    parser.add_argument(
-        "--output-dir",
-        default="data/raw",
-        help="Destination directory for downloaded annotations and trajectories",
-    )
+    parser.add_argument("--output-dir", default="data/raw", help="Destination directory for downloaded annotations and trajectories")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")

@@ -23,6 +23,7 @@ import os
 import numpy as np
 
 from irrgate.config import load_settings, save_settings
+from irrgate.utils import percentile, wilson_ci
 
 
 # ---------------------------------------------------------------------------
@@ -46,13 +47,7 @@ def load_records(progress_path: str) -> list[dict]:
 # Threshold derivation
 # ---------------------------------------------------------------------------
 
-def _percentile(values: list[float], p: float) -> float:
-    if not values:
-        return 0.0
-    sorted_v = sorted(values)
-    idx = p / 100.0 * (len(sorted_v) - 1)
-    lo, hi = int(idx), min(int(idx) + 1, len(sorted_v) - 1)
-    return sorted_v[lo] + (idx - lo) * (sorted_v[hi] - sorted_v[lo])
+# use `percentile` from `irrgate.utils`
 
 
 def derive_thresholds(
@@ -68,9 +63,9 @@ def derive_thresholds(
     """
     if not neg_values:
         return 0.1
-    tau_from_neg = _percentile(neg_values, neg_percentile)
+    tau_from_neg = percentile(neg_values, neg_percentile)
     if pos_values:
-        pos_low = _percentile(pos_values, 10.0)
+        pos_low = percentile(pos_values, 10.0)
         if pos_low > tau_from_neg:
             return (tau_from_neg + pos_low) / 2.0
     return tau_from_neg
@@ -123,14 +118,7 @@ def sensitivity_sweep(
 # Wilson confidence interval
 # ---------------------------------------------------------------------------
 
-def wilson_ci(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    if n == 0:
-        return 0.0, 0.0
-    p = k / n
-    denom = 1 + z ** 2 / n
-    centre = (p + z ** 2 / (2 * n)) / denom
-    margin = z * math.sqrt(p * (1 - p) / n + z ** 2 / (4 * n ** 2)) / denom
-    return max(0.0, centre - margin), min(1.0, centre + margin)
+# use `wilson_ci` from `irrgate.utils`
 
 
 # ---------------------------------------------------------------------------
@@ -245,12 +233,12 @@ def main() -> None:
     )))
 
     print(f"\n[analyze] --- Distribution summary ---")
-    print(f"  d_I     | neg: median={_percentile(neg_d, 50):.4f}  p90={_percentile(neg_d, 90):.4f}  "
-          f"pos: median={_percentile(pos_d, 50):.4f}  p10={_percentile(pos_d, 10):.4f}")
-    print(f"  irr_pos | neg: median={_percentile([float(v) for v in neg_irr], 50):.1f}  "
-          f"p90={_percentile([float(v) for v in neg_irr], 90):.1f}  "
-          f"pos: median={_percentile([float(v) for v in pos_irr], 50):.1f}  "
-          f"p10={_percentile([float(v) for v in pos_irr], 10):.1f}")
+        print(f"  d_I     | neg: median={percentile(neg_d, 50):.4f}  p90={percentile(neg_d, 90):.4f}  "
+            f"pos: median={percentile(pos_d, 50):.4f}  p10={percentile(pos_d, 10):.4f}")
+        print(f"  irr_pos | neg: median={percentile([float(v) for v in neg_irr], 50):.1f}  "
+            f"p90={percentile([float(v) for v in neg_irr], 90):.1f}  "
+            f"pos: median={percentile([float(v) for v in pos_irr], 50):.1f}  "
+            f"p10={percentile([float(v) for v in pos_irr], 10):.1f}")
     print(f"\n[analyze] Derived thresholds: tau_d={tau_d:.4f}  tau_pi={tau_pi}")
 
     tau_d_sweep     = [round(tau_d * f, 4) for f in [0.5, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.5, 2.0]]

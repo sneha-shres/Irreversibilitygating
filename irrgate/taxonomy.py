@@ -11,10 +11,7 @@ class Level(IntEnum):
 
 
 def severity_weight(level: Level, alpha: float = 0.5, beta: float = 0.0) -> float:
-    """Return the severity weight for a level.
-
-    L0=0, L1=beta (default 0 for backward compat), L2=alpha, L3=1.0.
-    """
+    """Severity weight: L0=0, L1=beta, L2=alpha, L3=1.0."""
     if level == Level.L0:
         return 0.0
     if level == Level.L1:

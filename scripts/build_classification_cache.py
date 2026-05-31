@@ -1,18 +1,8 @@
-"""Build the per-step classification cache.
+"""Build per-step classification cache (Parquet).
 
-Runs the classifier (stage 1 + stage 2) over every step of every trajectory in
-the eval set and writes results to data/classification_cache.parquet.
-
-One row per (trajectory_id, step_index). Safe to interrupt and resume — already-
-cached trajectory_ids are skipped on restart.
-
-Usage (from repo root):
-    PYTHONPATH=. python3 scripts/build_classification_cache.py
-    PYTHONPATH=. python3 scripts/build_classification_cache.py --no-resume
-    PYTHONPATH=. python3 scripts/build_classification_cache.py \\
-        --eval-set data/eval_set.json \\
-        --trajectory-dir data/raw \\
-        --output data/classification_cache.parquet
+Runs the classifier (stage1 + stage2) over each trajectory step and writes
+`data/classification_cache.parquet`. Safe to resume — existing trajectories
+are skipped when `--no-resume` is not used.
 """
 
 from __future__ import annotations
@@ -35,20 +25,19 @@ from irrgate.taxonomy import Level
 
 
 def find_trajectory_file(task_id: str, trajectory_dir: str, model: str | None = None) -> str:
+    """Locate a trajectory JSON by task_id; prefer top-level, then `cleaned/`.
+
+    If `model` is provided, prefer a path that contains the model name.
+    """
     candidate = os.path.join(trajectory_dir, f"{task_id}.json")
     if os.path.exists(candidate):
         return candidate
     cleaned = os.path.join(trajectory_dir, "cleaned")
     if os.path.exists(cleaned):
         for root, _dirs, files in os.walk(cleaned):
-            if f"{task_id}.json" in files:
-                if model is None or model in root:
-                    return os.path.join(root, f"{task_id}.json")
-    raise FileNotFoundError(
-        f"Trajectory file for task_id='{task_id}'"
-        + (f" model='{model}'" if model else "")
-        + f" not found in {trajectory_dir}"
-    )
+            if f"{task_id}.json" in files and (model is None or model in root):
+                return os.path.join(root, f"{task_id}.json")
+    raise FileNotFoundError(f"Trajectory file for task_id='{task_id}'{(' model='+model) if model else ''} not found in {trajectory_dir}")
 
 
 def _make_trajectory_id(task_id: str, model: str) -> str:

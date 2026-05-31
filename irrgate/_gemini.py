@@ -30,9 +30,9 @@ def _throttle() -> None:
 
 
 def generate_with_backoff(client, *, model, contents, config, max_retries: int = 6):
-    """Call generate_content with throttling + exponential backoff on 429 and network errors.
+    """Call `generate_content` with throttling and exponential backoff.
 
-    Returns the response, or None if every retry was exhausted.
+    Returns the response object or `None` if retries are exhausted.
     """
     import sys as _sys
     import time as _time
@@ -67,17 +67,14 @@ def generate_with_backoff(client, *, model, contents, config, max_retries: int =
             if not is_429:
                 raise
             if attempt == max_retries - 1:
-                print(f"[gemini] 429 final fallback after {max_retries} attempts", file=_sys.stderr, flush=True)
+                print(f"[gemini] 429 final fallback", file=_sys.stderr, flush=True)
                 return None
-            print(f"[gemini] 429 retry {attempt+1}/{max_retries} sleeping {delay:.0f}s",
-                  file=_sys.stderr, flush=True)
+            print(f"[gemini] 429 retry {attempt+1}/{max_retries} sleeping {delay:.0f}s", file=_sys.stderr, flush=True)
         except _RETRYABLE_NETWORK as exc:
             if attempt == max_retries - 1:
-                print(f"[gemini] network error final fallback after {max_retries} attempts: {exc}",
-                      file=_sys.stderr, flush=True)
+                print(f"[gemini] network error final fallback: {exc}", file=_sys.stderr, flush=True)
                 return None
-            print(f"[gemini] network error retry {attempt+1}/{max_retries} sleeping {delay:.0f}s: {exc}",
-                  file=_sys.stderr, flush=True)
+            print(f"[gemini] network error retry {attempt+1}/{max_retries} sleeping {delay:.0f}s: {exc}", file=_sys.stderr, flush=True)
         _time.sleep(delay)
         delay = min(delay * 2, 60.0)
     return None

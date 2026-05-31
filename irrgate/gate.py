@@ -16,17 +16,11 @@ class GateDecision:
     profile: RiskProfile
 
 
-def gate_decision(
-    profile: RiskProfile,
-    tau_d: float,
-    tau_pi: int,
-) -> Literal["approve", "block"]:
-    """Block iff f=1 and d_I >= tau_d OR irr_pos >= tau_pi."""
+def gate_decision(profile: RiskProfile, tau_d: float, tau_pi: int) -> Literal["approve", "block"]:
+    """Return 'block' if `profile` crosses either threshold, else 'approve'."""
     if profile.f == 0:
         return "approve"
-    if profile.d_I >= tau_d or profile.irr_pos >= tau_pi:
-        return "block"
-    return "approve"
+    return "block" if (profile.d_I >= tau_d or profile.irr_pos >= tau_pi) else "approve"
 
 
 def make_gate_decision(

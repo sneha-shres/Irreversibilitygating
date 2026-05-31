@@ -39,6 +39,7 @@ from collections import defaultdict
 from typing import Optional
 
 import pandas as pd
+from irrgate.utils import wilson_ci, percentile
 
 
 # ---------------------------------------------------------------------------
@@ -126,14 +127,7 @@ def stratified_kfold(
 # Metrics
 # ---------------------------------------------------------------------------
 
-def wilson_ci(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    if n == 0:
-        return 0.0, 0.0
-    p = k / n
-    denom = 1 + z ** 2 / n
-    centre = (p + z ** 2 / (2 * n)) / denom
-    margin = z * math.sqrt(p * (1 - p) / n + z ** 2 / (4 * n ** 2)) / denom
-    return max(0.0, centre - margin), min(1.0, centre + margin)
+# use `wilson_ci` from `irrgate.utils`
 
 
 def _evaluate(records: list[dict], variant_fn, tau_d: float, tau_pi: int) -> dict:
@@ -200,11 +194,7 @@ def _summarize_variants(
     def _across_splits(variant: str, key: str) -> list[float]:
         return [s["held_out"][variant][key] for s in splits_data]
 
-    def _percentile(vals: list[float], p: float) -> float:
-        sv = sorted(vals)
-        idx = p / 100 * (len(sv) - 1)
-        lo, hi = int(idx), min(int(idx) + 1, len(sv) - 1)
-        return sv[lo] + (idx - lo) * (sv[hi] - sv[lo])
+    # use `percentile` from `irrgate.utils`
 
     summary: dict[str, dict] = {}
     for vname in variant_names:
@@ -217,10 +207,10 @@ def _summarize_variants(
             "pooled_fpr":       pooled_fp[vname] / pooled_n_neg if pooled_n_neg else 0.0,
             "recall_wilson_lo": recall_lo, "recall_wilson_hi": recall_hi,
             "fpr_wilson_lo":    fpr_lo,    "fpr_wilson_hi":    fpr_hi,
-            "recall_p25":  _percentile(recalls, 25),
-            "recall_p75":  _percentile(recalls, 75),
-            "fpr_p25":     _percentile(fprs, 25),
-            "fpr_p75":     _percentile(fprs, 75),
+            "recall_p25":  percentile(recalls, 25),
+            "recall_p75":  percentile(recalls, 75),
+            "fpr_p25":     percentile(fprs, 25),
+            "fpr_p75":     percentile(fprs, 75),
             "pooled_tp": pooled_tp[vname],
             "pooled_fp": pooled_fp[vname],
             "pooled_n_pos": pooled_n_pos,
